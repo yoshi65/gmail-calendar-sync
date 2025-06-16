@@ -1,0 +1,66 @@
+name: Gmail Calendar Sync
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+    
+    - name: Install dependencies
+      run: uv sync
+    
+    - name: Run type check
+      run: uv run mypy src/
+    
+    - name: Run linter
+      run: uv run ruff check src/
+    
+    - name: Run Gmail Calendar Sync
+      env:
+        # Unified Google API credentials (recommended)
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        # Legacy individual credentials (for backward compatibility)
+        GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+        GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+        GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        CALENDAR_CLIENT_ID: ${{ secrets.CALENDAR_CLIENT_ID }}
+        CALENDAR_CLIENT_SECRET: ${{ secrets.CALENDAR_CLIENT_SECRET }}
+        CALENDAR_REFRESH_TOKEN: ${{ secrets.CALENDAR_REFRESH_TOKEN }}
+        # APIs
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        # Sync period (hours preferred for frequent execution)
+        SYNC_PERIOD_HOURS: ${{ vars.SYNC_PERIOD_HOURS || '8' }}
+        SYNC_PERIOD_DAYS: ${{ vars.SYNC_PERIOD_DAYS || '30' }}
+        LOG_LEVEL: INFO
+      run: uv run python -m src.main
+    
+    - name: Notify on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        text: 'Gmail Calendar Sync failed!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
