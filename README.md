@@ -595,18 +595,72 @@ uv run python cleanup_for_test.py
 | 1日1回 | `SYNC_PERIOD_HOURS=30` | 余裕を持った範囲 |
 | デバッグ | `SYNC_PERIOD_HOURS=1` | 最新メールのみ |
 
+## 🔧 開発・保守の自動化
+
+### Pre-commit Hooks ✨ NEW!
+ローカル開発でのコード品質を自動保証：
+
+```bash
+# Pre-commit hooks のインストール
+uv run pre-commit install
+
+# 手動実行
+uv run pre-commit run --all-files
+```
+
+**自動実行される品質チェック**:
+- **ruff**: コードフォーマット・リンター
+- **mypy**: 型チェック
+- **一般チェック**: ファイル形式・末尾改行・機密情報検出
+
+### Renovate 依存関係自動更新 ✨ NEW!
+パッケージとセキュリティの自動保守：
+
+- **スケジュール**: 月曜深夜（日本時間）に自動チェック
+- **Auto-merge**: 安全なパッチアップデートは自動マージ
+- **セキュリティアラート**: 脆弱性発見時の即座PR作成
+- **分離管理**: 本番/開発依存関係を別々に処理
+
+### 開発プロセス改善の教訓
+
+#### **CI失敗防止の重要性**
+```bash
+# ❌ 以前: CI でフォーマットエラー
+# ✅ 現在: Pre-commit でローカル検出
+git commit  # 自動的にruff・mypy実行
+```
+
+#### **依存関係管理の自動化**
+```bash
+# ❌ 以前: 手動でのパッケージ更新
+# ✅ 現在: Renovateの自動PR + auto-merge
+```
+
+#### **バージョン管理の標準化**
+```bash
+# 開発環境の一貫性確保
+.python-version    # Python 3.11
+.tool-versions     # asdf/rtx互換
+```
+
 ## 🤝 貢献
+
+詳細な貢献ガイドは [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
+
+### クイックスタート
 
 1. フォークしてfeatureブランチを作成
 2. 変更を実装
-3. テストが通ることを確認
-4. プルリクエストを作成
+3. Pre-commit hooksでローカル品質チェック
+4. テストが通ることを確認
+5. プルリクエストを作成
 
 ### 開発ガイドライン
 
-- **コードスタイル**: ruff準拠
+- **コードスタイル**: ruff準拠（Pre-commitで自動チェック）
 - **型注釈**: 必須（mypy strictモード）
 - **テスト**: 新機能には必ずテストを追加
+- **セキュリティ**: [SECURITY.md](SECURITY.md) を参照
 - **ドキュメント**: README・CLAUDE.mdを更新
 
 ## 📄 ライセンス
