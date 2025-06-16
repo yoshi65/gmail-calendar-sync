@@ -1,0 +1,22 @@
+# Gmail Calendar Sync - Code Owners
+# 
+# This file defines individuals or teams that are responsible 
+# for code in this repository.
+#
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+# Global owner - all files require review from yoshi65
+* @yoshi65
+
+# Specific patterns for critical files
+/.github/ @yoshi65
+/src/ @yoshi65
+/tests/ @yoshi65
+pyproject.toml @yoshi65
+README.md @yoshi65
+CLAUDE.md @yoshi65
+
+# Security-sensitive files require explicit approval
+.env.example @yoshi65
+get_refresh_token.py @yoshi65
