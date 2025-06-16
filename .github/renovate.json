@@ -1,0 +1,84 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "security:openssf-scorecard",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "schedule": [
+    "after 1am and before 5am on monday"
+  ],
+  "timezone": "Asia/Tokyo",
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "after 1am and before 5am on sunday"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev dependencies",
+      "schedule": [
+        "after 1am and before 5am on monday"
+      ]
+    },
+    {
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["patch"],
+      "groupName": "production dependencies (patch)",
+      "schedule": [
+        "after 1am and before 5am on monday"
+      ]
+    },
+    {
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor"],
+      "groupName": "production dependencies (minor)",
+      "schedule": [
+        "after 1am and before 5am on monday"
+      ]
+    },
+    {
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "openai",
+        "google-api-python-client",
+        "google-auth-oauthlib",
+        "structlog"
+      ],
+      "reviewersFromCodeOwners": true,
+      "addLabels": ["critical-dependencies"]
+    },
+    {
+      "matchPackageNames": [
+        "pytest",
+        "mypy",
+        "ruff"
+      ],
+      "matchUpdateTypes": ["major"],
+      "enabled": true,
+      "addLabels": ["dev-tools-update"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "addLabels": ["priority/high"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true
+}
