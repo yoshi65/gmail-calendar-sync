@@ -71,6 +71,28 @@
       "matchUpdateTypes": ["major"],
       "enabled": true,
       "addLabels": ["dev-tools-update"]
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "addLabels": ["automerge"]
+    },
+    {
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "automerge": true,
+      "automergeType": "pr",
+      "addLabels": ["automerge", "lockfile-update"]
+    },
+    {
+      "matchPackageNames": [
+        "openai",
+        "google-api-python-client",
+        "google-auth-oauthlib",
+        "structlog"
+      ],
+      "automerge": false
     }
   ],
   "vulnerabilityAlerts": {
@@ -80,5 +102,11 @@
   },
   "osvVulnerabilityAlerts": true,
   "separateMajorMinor": true,
-  "separateMultipleMajor": true
+  "separateMultipleMajor": true,
+  "platformAutomerge": true,
+  "automerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "ignoreTests": false,
+  "rebaseWhen": "behind-base-branch"
 }
