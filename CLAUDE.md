@@ -32,6 +32,7 @@ src/
 ├── models/           # Pydanticモデル定義
 │   ├── email_types.py    # メール種別の型定義
 │   ├── flight.py         # 航空券情報モデル
+│   ├── carshare.py       # カーシェア情報モデル
 │   └── calendar.py       # カレンダーイベントモデル
 ├── services/         # 外部API連携
 │   ├── gmail_client.py   # Gmail API クライアント
@@ -40,10 +41,12 @@ src/
 ├── processors/       # メール処理ロジック
 │   ├── base.py          # 基底プロセッサー
 │   ├── flight_processor.py # 航空券処理
+│   ├── carshare_processor.py # カーシェア処理
 │   └── factory.py       # プロセッサーファクトリー
 ├── utils/           # ユーティリティ
 │   ├── config.py        # 設定管理
 │   ├── logging.py       # ログ設定
+│   ├── email_filter.py  # 宣伝メールフィルタ
 │   └── exceptions.py    # カスタム例外
 └── main.py          # エントリーポイント
 ```
@@ -70,7 +73,7 @@ SYNC_PERIOD_DAYS=30  # 同期対象期間
 
 ## メール種別と対応ドメイン
 - **航空券**: ana.co.jp, booking.jal.com
-- **カーシェア**: (将来拡張)
+- **カーシェア**: carshares.jp, share.timescar.jp
 - **飲食店**: (将来拡張)
 
 ## 実装完了状況
@@ -87,11 +90,20 @@ SYNC_PERIOD_DAYS=30  # 同期対象期間
 - ✅ Google Calendar予定作成 (往復便対応)
 - ✅ 重複防止ロジック (処理済みラベル)
 
+### ✅ Phase 2.5: カーシェア処理 (完了)
+- ✅ カーシェアメール検出ロジック (carshares.jp, share.timescar.jp)
+- ✅ 時間ベース競合解決（新規予約が既存予約を自動置換）
+- ✅ キャンセルメール対応（既存イベント削除）
+- ✅ 予約状態管理（予約・変更・キャンセル・完了）
+- ✅ 時系列処理（メール受信順でのイベント処理）
+
 ### ✅ Phase 3: 運用改善 (完了)
 - ✅ エラーハンドリング強化 (カスタム例外)
 - ✅ Slack通知機能 (成功・失敗レポート)
 - ✅ 単体テスト追加 (models, processors, config)
 - ✅ CI/CDパイプライン (型チェック・リンター統合)
+- ✅ 宣伝メールフィルタ（OpenAI API送信前の自動除外）
+- ✅ コスト最適化（不要なOpenAI API呼び出し削減）
 
 ### 🔮 Phase 4: 将来拡張 (未実装)
 - [ ] カーシェア予約メール対応

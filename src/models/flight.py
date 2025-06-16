@@ -2,11 +2,12 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Airport(BaseModel):
     """Airport information."""
+
     code: str = Field(..., description="Airport code (e.g., NRT, HND)")
     name: str | None = Field(None, description="Airport name")
     city: str | None = Field(None, description="City name")
@@ -14,6 +15,7 @@ class Airport(BaseModel):
 
 class FlightSegment(BaseModel):
     """Individual flight segment."""
+
     airline: str = Field(..., description="Airline name")
     flight_number: str = Field(..., description="Flight number")
     departure_airport: Airport
@@ -23,7 +25,8 @@ class FlightSegment(BaseModel):
     aircraft_type: str | None = Field(None, description="Aircraft type")
     seat_number: str | None = Field(None, description="Seat number")
 
-    @validator("departure_time", "arrival_time")
+    @field_validator("departure_time", "arrival_time")
+    @classmethod
     def validate_times(cls, v: datetime) -> datetime:
         """Ensure times are timezone-aware."""
         if v.tzinfo is None:
@@ -33,16 +36,21 @@ class FlightSegment(BaseModel):
 
 class FlightBooking(BaseModel):
     """Complete flight booking information."""
+
     confirmation_code: str | None = Field(None, description="Booking confirmation code")
     passenger_name: str = Field(..., description="Passenger name")
-    booking_reference: str | None = Field(None, description="Additional booking reference")
+    booking_reference: str | None = Field(
+        None, description="Additional booking reference"
+    )
 
     # Flight segments (outbound and return)
     outbound_segments: list[FlightSegment] = Field(..., min_length=1)
     return_segments: list[FlightSegment] = Field(default_factory=list)
 
     # Booking details
-    booking_date: datetime | None = Field(None, description="Date when booking was made")
+    booking_date: datetime | None = Field(
+        None, description="Date when booking was made"
+    )
     total_price: str | None = Field(None, description="Total price with currency")
 
     # Check-in information

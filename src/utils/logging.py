@@ -2,8 +2,10 @@
 
 import logging
 import sys
+from typing import Any
 
 import structlog
+from structlog.types import Processor
 
 
 def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None:
@@ -17,7 +19,7 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
     )
 
     # Configure structlog processors
-    processors = [
+    processors: list[Processor] = [
         # Add timestamp
         structlog.processors.TimeStamper(fmt="ISO"),
         # Add log level
@@ -28,15 +30,12 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
 
     if json_format:
         # JSON output for production (easier to parse in log aggregation systems)
-        processors.extend([
-            structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer()
-        ])
+        processors.extend(
+            [structlog.processors.dict_tracebacks, structlog.processors.JSONRenderer()]
+        )
     else:
         # Human-readable output for development
-        processors.extend([
-            structlog.dev.ConsoleRenderer(colors=True)
-        ])
+        processors.extend([structlog.dev.ConsoleRenderer(colors=True)])
 
     structlog.configure(
         processors=processors,
@@ -46,7 +45,7 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
     )
 
 
-def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> Any:
     """Get a structured logger instance."""
     return structlog.get_logger(name)
 
@@ -54,8 +53,15 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 def mask_sensitive_data(data: dict) -> dict:
     """Mask sensitive information in log data."""
     sensitive_keys = {
-        "password", "token", "secret", "key", "credential",
-        "authorization", "api_key", "refresh_token", "access_token"
+        "password",
+        "token",
+        "secret",
+        "key",
+        "credential",
+        "authorization",
+        "api_key",
+        "refresh_token",
+        "access_token",
     }
 
     masked_data = data.copy()

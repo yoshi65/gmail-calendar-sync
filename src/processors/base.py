@@ -25,6 +25,8 @@ class BaseEmailProcessor(ABC):
         pass
 
     @abstractmethod
-    def create_calendar_events(self, extracted_data: dict, email: EmailMessage) -> list[CalendarEvent]:
+    def create_calendar_events(
+        self, extracted_data: dict, email: EmailMessage
+    ) -> list[CalendarEvent]:
         """Create calendar events from extracted data."""
         pass
