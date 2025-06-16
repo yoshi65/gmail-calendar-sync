@@ -2,8 +2,10 @@
 
 import logging
 import sys
+from typing import Any
 
 import structlog
+from structlog.types import Processor
 
 
 def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None:
@@ -17,7 +19,7 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
     )
 
     # Configure structlog processors
-    processors = [
+    processors: list[Processor] = [
         # Add timestamp
         structlog.processors.TimeStamper(fmt="ISO"),
         # Add log level
@@ -46,7 +48,7 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
     )
 
 
-def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> Any:
     """Get a structured logger instance."""
     return structlog.get_logger(name)
 

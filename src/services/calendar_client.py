@@ -5,7 +5,6 @@ from typing import Any
 import structlog
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -23,11 +22,11 @@ class CalendarClient:
         self._service = None
         self.calendar_id = "primary"  # Use primary calendar
 
-    def _get_service(self):
+    def _get_service(self) -> Any:
         """Get Google Calendar API service."""
         if self._service is None:
             client_id, client_secret, refresh_token = self.settings.get_calendar_credentials()
-            
+
             credentials = Credentials(
                 token=None,
                 refresh_token=refresh_token,
@@ -192,7 +191,7 @@ class CalendarClient:
         # If no confirmation code, just check if any event exists
         logger.info("Event already exists", source_email_id=source_email_id)
         return True
-    
+
     def find_events_by_confirmation_code(self, confirmation_code: str) -> list[dict[str, Any]]:
         """Find calendar events by confirmation code."""
         try:
@@ -216,7 +215,7 @@ class CalendarClient:
                         confirmation_code=confirmation_code,
                         error=str(error))
             return []
-    
+
     def find_events_by_booking_reference(self, booking_reference: str) -> list[dict[str, Any]]:
         """Find calendar events by booking reference."""
         try:
@@ -240,88 +239,88 @@ class CalendarClient:
                         booking_reference=booking_reference,
                         error=str(error))
             return []
-    
+
     def check_event_exists_by_confirmation(self, confirmation_code: str) -> bool:
         """Check if events already exist for the given confirmation code."""
         events = self.find_events_by_confirmation_code(confirmation_code)
         exists = len(events) > 0
-        
+
         if exists:
-            logger.info("Events already exist for confirmation code", 
-                       confirmation_code=confirmation_code, 
+            logger.info("Events already exist for confirmation code",
+                       confirmation_code=confirmation_code,
                        count=len(events))
-        
+
         return exists
-    
+
     def find_events_by_reservation_id(self, booking_reference: str | None, confirmation_code: str | None) -> list[dict[str, Any]]:
         """Find calendar events by booking reference (preferred) or confirmation code (fallback)."""
         events = []
-        
+
         # First try to find by booking reference (preferred)
         if booking_reference:
             events = self.find_events_by_booking_reference(booking_reference)
             if events:
-                logger.info("Found events by booking reference", 
+                logger.info("Found events by booking reference",
                            booking_reference=booking_reference,
                            count=len(events))
                 return events
-        
+
         # Fallback to confirmation code
         if confirmation_code:
             events = self.find_events_by_confirmation_code(confirmation_code)
             if events:
-                logger.info("Found events by confirmation code (fallback)", 
+                logger.info("Found events by confirmation code (fallback)",
                            confirmation_code=confirmation_code,
                            count=len(events))
                 return events
-        
-        logger.info("No events found", 
+
+        logger.info("No events found",
                    booking_reference=booking_reference,
                    confirmation_code=confirmation_code)
         return []
-    
+
     def needs_update(self, existing_event: dict[str, Any], new_event: CalendarEvent) -> bool:
         """Check if an existing event needs to be updated with new information."""
         try:
             # Get extended properties from existing event
             existing_props = existing_event.get("extendedProperties", {}).get("private", {})
-            
+
             # Convert new event to Google Calendar format to get comparable properties
             new_event_data = new_event.to_google_calendar_format()
             new_props = new_event_data.get("extendedProperties", {}).get("private", {})
-            
+
             # Check seat number updates (e.g., from "未指定" to specific seat)
             existing_seat = existing_props.get("seat_number", "")
             new_seat = new_props.get("seat_number", "")
             if existing_seat != new_seat and new_seat and new_seat != "未指定":
-                logger.info("Seat number update detected", 
+                logger.info("Seat number update detected",
                            existing=existing_seat, new=new_seat)
                 return True
-            
+
             # Check time changes
             existing_start = existing_event.get("start", {}).get("dateTime", "")
             new_start = new_event.start_time.isoformat() if new_event.start_time else ""
             if existing_start != new_start:
-                logger.info("Start time update detected", 
+                logger.info("Start time update detected",
                            existing=existing_start, new=new_start)
                 return True
-            
+
             existing_end = existing_event.get("end", {}).get("dateTime", "")
             new_end = new_event.end_time.isoformat() if new_event.end_time else ""
             if existing_end != new_end:
-                logger.info("End time update detected", 
+                logger.info("End time update detected",
                            existing=existing_end, new=new_end)
                 return True
-            
+
             # Check description changes (might contain updated info)
             existing_desc = existing_event.get("description", "")
             new_desc = new_event.description or ""
             if len(new_desc) > len(existing_desc):
                 logger.info("Description update detected (more detailed info)")
                 return True
-            
+
             return False
-            
+
         except Exception as error:
             logger.error("Error checking if update needed", error=str(error))
             return False

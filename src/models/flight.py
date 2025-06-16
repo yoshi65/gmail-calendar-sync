@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Airport(BaseModel):
@@ -23,7 +23,8 @@ class FlightSegment(BaseModel):
     aircraft_type: str | None = Field(None, description="Aircraft type")
     seat_number: str | None = Field(None, description="Seat number")
 
-    @validator("departure_time", "arrival_time")
+    @field_validator("departure_time", "arrival_time")
+    @classmethod
     def validate_times(cls, v: datetime) -> datetime:
         """Ensure times are timezone-aware."""
         if v.tzinfo is None:

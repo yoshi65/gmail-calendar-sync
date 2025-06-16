@@ -9,6 +9,7 @@ from ..models.flight import FlightBooking
 from ..services.calendar_client import CalendarClient
 from ..services.openai_client import OpenAIClient
 from ..utils.config import Settings
+from ..utils.email_filter import is_promotional_email
 from .base import BaseEmailProcessor
 
 logger = structlog.get_logger()
@@ -39,6 +40,18 @@ class FlightEmailProcessor(BaseEmailProcessor):
                    domain=email.domain)
 
         try:
+            # Check if email is promotional before sending to OpenAI
+            if is_promotional_email(email):
+                logger.info("Skipping promotional email",
+                           email_id=email.id,
+                           subject=email.subject[:100])
+                return ProcessingResult(
+                    email_id=email.id,
+                    email_type=EmailType.FLIGHT,
+                    success=False,
+                    error_message="Skipped promotional email"
+                )
+
             # Extract flight data using OpenAI
             extracted_data = self.extract_data(email)
 
@@ -91,7 +104,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
 
             if flight_booking:
                 # Convert to dict for storage
-                return flight_booking.dict()
+                return flight_booking.model_dump()
 
             return None
 
@@ -112,20 +125,20 @@ class FlightEmailProcessor(BaseEmailProcessor):
             # Check if events already exist for this confirmation code or booking reference
             if confirmation_code:
                 existing_events = self.calendar_client.find_events_by_confirmation_code(confirmation_code)
-                logger.info("Using confirmation code for duplicate detection", 
+                logger.info("Using confirmation code for duplicate detection",
                            confirmation_code=confirmation_code,
                            email_id=email.id)
             elif booking_reference:
                 # Fallback to booking reference if no confirmation code
                 existing_events = self.calendar_client.find_events_by_booking_reference(booking_reference)
-                logger.info("Using booking reference as fallback identifier", 
+                logger.info("Using booking reference as fallback identifier",
                            booking_reference=booking_reference,
                            email_id=email.id)
             else:
                 existing_events = []
-                logger.warning("No confirmation code or booking reference found", 
+                logger.warning("No confirmation code or booking reference found",
                              email_id=email.id)
-            
+
             # Create new calendar events from flight data
             new_calendar_events = create_flight_events(flight_booking, email.id)
 
@@ -136,7 +149,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
                            booking_reference=booking_reference,
                            existing_count=len(existing_events),
                            new_count=len(new_calendar_events))
-                
+
                 # Update existing events if needed
                 updated_count = 0
                 for i, new_event in enumerate(new_calendar_events):
@@ -158,7 +171,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
                             logger.info("No update needed for existing event",
                                        event_id=existing_event["id"],
                                        confirmation_code=confirmation_code)
-                
+
                 # If there are more new events than existing ones, create the additional ones
                 if len(new_calendar_events) > len(existing_events):
                     for new_event in new_calendar_events[len(existing_events):]:
@@ -167,19 +180,19 @@ class FlightEmailProcessor(BaseEmailProcessor):
                             logger.info("Created additional calendar event",
                                        event_id=event_id,
                                        confirmation_code=confirmation_code)
-                
+
                 logger.info("Processed existing events",
                            email_id=email.id,
                            confirmation_code=confirmation_code,
                            updated_count=updated_count)
-                
+
                 return new_calendar_events  # Return the new events for consistency
-            
+
             else:
                 # No existing events, create new ones
                 event_ids = self.calendar_client.create_events(new_calendar_events)
                 successful_count = sum(1 for event_id in event_ids if event_id is not None)
-                
+
                 logger.info("Created new calendar events",
                            email_id=email.id,
                            confirmation_code=confirmation_code,
