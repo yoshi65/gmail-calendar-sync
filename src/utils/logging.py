@@ -30,15 +30,12 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
 
     if json_format:
         # JSON output for production (easier to parse in log aggregation systems)
-        processors.extend([
-            structlog.processors.dict_tracebacks,
-            structlog.processors.JSONRenderer()
-        ])
+        processors.extend(
+            [structlog.processors.dict_tracebacks, structlog.processors.JSONRenderer()]
+        )
     else:
         # Human-readable output for development
-        processors.extend([
-            structlog.dev.ConsoleRenderer(colors=True)
-        ])
+        processors.extend([structlog.dev.ConsoleRenderer(colors=True)])
 
     structlog.configure(
         processors=processors,
@@ -56,8 +53,15 @@ def get_logger(name: str | None = None) -> Any:
 def mask_sensitive_data(data: dict) -> dict:
     """Mask sensitive information in log data."""
     sensitive_keys = {
-        "password", "token", "secret", "key", "credential",
-        "authorization", "api_key", "refresh_token", "access_token"
+        "password",
+        "token",
+        "secret",
+        "key",
+        "credential",
+        "authorization",
+        "api_key",
+        "refresh_token",
+        "access_token",
     }
 
     masked_data = data.copy()

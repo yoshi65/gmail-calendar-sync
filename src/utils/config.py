@@ -7,9 +7,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
     # Google APIs OAuth2 (shared for Gmail and Calendar)
@@ -31,7 +29,7 @@ class Settings(BaseSettings):
     # Optional settings
     slack_webhook_url: str | None = None
     sync_period_hours: int = 8  # Default 8 hours
-    sync_period_days: int = 30   # Fallback for backward compatibility
+    sync_period_days: int = 30  # Fallback for backward compatibility
     log_level: str = "INFO"
 
     # Date range settings (optional, overrides period settings)

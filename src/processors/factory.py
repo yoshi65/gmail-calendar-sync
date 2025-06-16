@@ -1,6 +1,5 @@
 """Email processor factory."""
 
-
 from ..models.email_types import EmailMessage
 from ..utils.config import Settings
 from .base import BaseEmailProcessor

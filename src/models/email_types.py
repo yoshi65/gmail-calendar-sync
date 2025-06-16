@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class EmailType(str, Enum):
     """Supported email types."""
+
     FLIGHT = "flight"
     CAR_SHARE = "car_share"
     RESTAURANT = "restaurant"
@@ -16,6 +17,7 @@ class EmailType(str, Enum):
 
 class EmailMessage(BaseModel):
     """Email message data."""
+
     id: str
     subject: str
     sender: str
@@ -38,6 +40,7 @@ class EmailMessage(BaseModel):
 
 class ProcessingResult(BaseModel):
     """Result of email processing."""
+
     email_id: str
     email_type: EmailType
     success: bool

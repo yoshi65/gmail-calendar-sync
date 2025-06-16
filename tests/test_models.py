@@ -55,7 +55,7 @@ class TestFlightSegment:
             arrival_airport=arr_airport,
             departure_time=departure_time,
             arrival_time=arrival_time,
-            seat_number="14A"
+            seat_number="14A",
         )
 
         assert segment.airline == "ANA"
@@ -104,7 +104,7 @@ class TestFlightBooking:
         booking = FlightBooking(
             confirmation_code="ABC123",
             passenger_name="Taro Yamada",
-            outbound_segments=[sample_segment]
+            outbound_segments=[sample_segment],
         )
 
         assert booking.confirmation_code == "ABC123"
@@ -129,7 +129,7 @@ class TestFlightBooking:
             confirmation_code="ABC123",
             passenger_name="Taro Yamada",
             outbound_segments=[sample_segment],
-            return_segments=[return_segment]
+            return_segments=[return_segment],
         )
 
         assert booking.is_round_trip
@@ -148,7 +148,7 @@ class TestEmailMessage:
             sender="noreply@ana.co.jp",
             body="Your flight is confirmed",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         assert email.id == "msg123"
@@ -162,7 +162,7 @@ class TestEmailMessage:
             sender="John Doe <john@booking.jal.com>",
             body="Test body",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         assert email.domain == "booking.jal.com"
@@ -181,7 +181,7 @@ class TestCalendarEvent:
             start_time=start_time,
             end_time=end_time,
             source_email_id="msg123",
-            confirmation_code="ABC123"
+            confirmation_code="ABC123",
         )
 
         assert event.summary == "Flight ANA NH006"
@@ -200,7 +200,7 @@ class TestCalendarEvent:
             end_time=end_time,
             location="Narita Airport",
             source_email_id="msg123",
-            confirmation_code="ABC123"
+            confirmation_code="ABC123",
         )
 
         google_format = event.to_google_calendar_format()
@@ -209,7 +209,10 @@ class TestCalendarEvent:
         assert google_format["description"] == "Flight details"
         assert google_format["location"] == "Narita Airport"
         assert "extendedProperties" in google_format
-        assert google_format["extendedProperties"]["private"]["source_email_id"] == "msg123"
+        assert (
+            google_format["extendedProperties"]["private"]["source_email_id"]
+            == "msg123"
+        )
 
 
 class TestCarInfo:
@@ -218,9 +221,7 @@ class TestCarInfo:
     def test_car_info_creation(self):
         """Test car info creation."""
         car = CarInfo(
-            car_type="デミオ",
-            car_number="品川 500 あ 1234",
-            car_name="Car001"
+            car_type="デミオ", car_number="品川 500 あ 1234", car_name="Car001"
         )
 
         assert car.car_type == "デミオ"
@@ -244,7 +245,7 @@ class TestStationInfo:
         station = StationInfo(
             station_name="新宿ステーション",
             station_address="東京都新宿区1-1-1",
-            station_code="ST001"
+            station_code="ST001",
         )
 
         assert station.station_name == "新宿ステーション"
@@ -269,16 +270,14 @@ class TestCarShareBooking:
         return StationInfo(
             station_name="新宿ステーション",
             station_address="東京都新宿区1-1-1",
-            station_code="ST001"
+            station_code="ST001",
         )
 
     @pytest.fixture
     def sample_car(self):
         """Create sample car."""
         return CarInfo(
-            car_type="デミオ",
-            car_number="品川 500 あ 1234",
-            car_name="Car001"
+            car_type="デミオ", car_number="品川 500 あ 1234", car_name="Car001"
         )
 
     def test_carshare_booking_creation(self, sample_station, sample_car):
@@ -298,7 +297,7 @@ class TestCarShareBooking:
             station=sample_station,
             car=sample_car,
             booking_date=booking_date,
-            total_price="¥1,200"
+            total_price="¥1,200",
         )
 
         assert booking.booking_reference == "CS123456"
@@ -322,7 +321,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=sample_station
+            station=sample_station,
         )
 
         assert booking.duration_hours == 2.5
@@ -339,7 +338,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=sample_station
+            station=sample_station,
         )
         assert active_booking.is_active is True
 
@@ -350,7 +349,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=sample_station
+            station=sample_station,
         )
         assert cancelled_booking.is_active is False
 
@@ -364,7 +363,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=sample_station
+            station=sample_station,
         )
 
         expected_key = "CarShareProvider.TIMES_CAR_ST001_202401151030"
@@ -381,7 +380,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=station
+            station=station,
         )
 
         expected_key = "CarShareProvider.MITSUI_CARSHARES_新宿ステーション_202401151030"
@@ -397,7 +396,7 @@ class TestCarShareBooking:
             user_name="山田太郎",
             start_time=start_time,
             end_time=end_time,
-            station=sample_station
+            station=sample_station,
         )
 
         assert booking.provider == CarShareProvider.TIMES_CAR
@@ -417,11 +416,16 @@ class TestCarShareProvider:
 
     def test_get_provider_from_domain_times_car(self):
         """Test getting Times Car provider from domain."""
-        assert get_provider_from_domain("share.timescar.jp") == CarShareProvider.TIMES_CAR
+        assert (
+            get_provider_from_domain("share.timescar.jp") == CarShareProvider.TIMES_CAR
+        )
 
     def test_get_provider_from_domain_mitsui(self):
         """Test getting Mitsui CarShares provider from domain."""
-        assert get_provider_from_domain("carshares.jp") == CarShareProvider.MITSUI_CARSHARES
+        assert (
+            get_provider_from_domain("carshares.jp")
+            == CarShareProvider.MITSUI_CARSHARES
+        )
 
     def test_get_provider_from_unknown_domain(self):
         """Test getting provider from unknown domain."""
@@ -430,8 +434,14 @@ class TestCarShareProvider:
 
     def test_get_provider_with_subdomain(self):
         """Test getting provider with subdomain."""
-        assert get_provider_from_domain("mail.carshares.jp") == CarShareProvider.MITSUI_CARSHARES
-        assert get_provider_from_domain("subdomain.share.timescar.jp") == CarShareProvider.TIMES_CAR
+        assert (
+            get_provider_from_domain("mail.carshares.jp")
+            == CarShareProvider.MITSUI_CARSHARES
+        )
+        assert (
+            get_provider_from_domain("subdomain.share.timescar.jp")
+            == CarShareProvider.TIMES_CAR
+        )
 
 
 class TestBookingStatus:

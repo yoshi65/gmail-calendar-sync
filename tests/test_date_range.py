@@ -55,9 +55,18 @@ class TestDateRangeAndTimeFeature:
 
         finally:
             # Clean up environment variables
-            for key in ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
-                       "CALENDAR_CLIENT_ID", "CALENDAR_CLIENT_SECRET", "CALENDAR_REFRESH_TOKEN",
-                       "OPENAI_API_KEY", "SYNC_START_DATE", "SYNC_END_DATE", "SYNC_PERIOD_HOURS"]:
+            for key in [
+                "GMAIL_CLIENT_ID",
+                "GMAIL_CLIENT_SECRET",
+                "GMAIL_REFRESH_TOKEN",
+                "CALENDAR_CLIENT_ID",
+                "CALENDAR_CLIENT_SECRET",
+                "CALENDAR_REFRESH_TOKEN",
+                "OPENAI_API_KEY",
+                "SYNC_START_DATE",
+                "SYNC_END_DATE",
+                "SYNC_PERIOD_HOURS",
+            ]:
                 os.environ.pop(key, None)
 
     def test_search_emails_with_date_range(self, gmail_client):
@@ -69,9 +78,7 @@ class TestDateRangeAndTimeFeature:
 
         # Test with date range
         result = gmail_client.search_emails(
-            query="from:ana.co.jp",
-            start_date="2024-01-01",
-            end_date="2024-01-31"
+            query="from:ana.co.jp", start_date="2024-01-01", end_date="2024-01-31"
         )
 
         assert result == ["msg1", "msg2"]
@@ -89,8 +96,7 @@ class TestDateRangeAndTimeFeature:
         }
 
         result = gmail_client.search_emails(
-            query="from:ana.co.jp",
-            start_date="2024-01-01"
+            query="from:ana.co.jp", start_date="2024-01-01"
         )
 
         assert result == ["msg1"]
@@ -107,8 +113,7 @@ class TestDateRangeAndTimeFeature:
         }
 
         result = gmail_client.search_emails(
-            query="from:ana.co.jp",
-            end_date="2024-01-31"
+            query="from:ana.co.jp", end_date="2024-01-31"
         )
 
         assert result == ["msg1"]
@@ -128,7 +133,7 @@ class TestDateRangeAndTimeFeature:
             query="from:ana.co.jp",
             since_days=30,
             start_date="2024-01-01",
-            end_date="2024-01-31"
+            end_date="2024-01-31",
         )
 
         call_args = gmail_client._service.users().messages().list.call_args
@@ -149,10 +154,7 @@ class TestDateRangeAndTimeFeature:
             "messages": [{"id": "msg1"}]
         }
 
-        result = gmail_client.search_emails(
-            query="from:ana.co.jp",
-            since_hours=8
-        )
+        result = gmail_client.search_emails(query="from:ana.co.jp", since_hours=8)
 
         assert result == ["msg1"]
 
@@ -173,7 +175,7 @@ class TestDateRangeAndTimeFeature:
         gmail_client.search_emails(
             query="from:ana.co.jp",
             since_days=30,
-            since_hours=8  # Should take precedence
+            since_hours=8,  # Should take precedence
         )
 
         call_args = gmail_client._service.users().messages().list.call_args
@@ -194,13 +196,13 @@ class TestDateRangeAndTimeFeature:
         with pytest.raises(ValueError, match="Invalid start_date format"):
             gmail_client.search_emails(
                 query="from:ana.co.jp",
-                start_date="01/01/2024"  # Wrong format
+                start_date="01/01/2024",  # Wrong format
             )
 
         with pytest.raises(ValueError, match="Invalid end_date format"):
             gmail_client.search_emails(
                 query="from:ana.co.jp",
-                end_date="2024-13-01"  # Invalid date
+                end_date="2024-13-01",  # Invalid date
             )
 
     @patch("src.services.gmail_client.GmailClient.get_email")
@@ -216,11 +218,12 @@ class TestDateRangeAndTimeFeature:
         }
 
         result = gmail_client.get_flight_emails(
-            start_date="2024-01-01",
-            end_date="2024-01-31"
+            start_date="2024-01-01", end_date="2024-01-31"
         )
 
-        assert len(result) == len(gmail_client.settings.flight_domains)  # One email per domain
+        assert len(result) == len(
+            gmail_client.settings.flight_domains
+        )  # One email per domain
 
         # Verify search was called with correct parameters
         call_args = gmail_client._service.users().messages().list.call_args
@@ -242,7 +245,9 @@ class TestDateRangeAndTimeFeature:
 
         result = gmail_client.get_flight_emails(since_hours=8)
 
-        assert len(result) == len(gmail_client.settings.flight_domains)  # One email per domain
+        assert len(result) == len(
+            gmail_client.settings.flight_domains
+        )  # One email per domain
 
         # Verify search was called with correct parameters
         call_args = gmail_client._service.users().messages().list.call_args

@@ -8,12 +8,14 @@ from pydantic import BaseModel, Field
 
 class CarShareProvider(str, Enum):
     """Supported car sharing providers."""
+
     MITSUI_CARSHARES = "mitsui_carshares"
     TIMES_CAR = "times_car"
 
 
 class BookingStatus(str, Enum):
     """Car sharing booking status."""
+
     RESERVED = "reserved"
     CHANGED = "changed"
     CANCELLED = "cancelled"
@@ -22,6 +24,7 @@ class BookingStatus(str, Enum):
 
 class CarInfo(BaseModel):
     """Car information."""
+
     car_type: str | None = Field(None, description="Car type/model")
     car_number: str | None = Field(None, description="Car license plate number")
     car_name: str | None = Field(None, description="Car name/identifier")
@@ -29,6 +32,7 @@ class CarInfo(BaseModel):
 
 class StationInfo(BaseModel):
     """Car sharing station information."""
+
     station_name: str = Field(..., description="Station name")
     station_address: str | None = Field(None, description="Station address")
     station_code: str | None = Field(None, description="Station code/ID")
@@ -36,6 +40,7 @@ class StationInfo(BaseModel):
 
 class CarShareBooking(BaseModel):
     """Car sharing booking information."""
+
     # Booking identification
     booking_reference: str | None = Field(None, description="Booking reference number")
     confirmation_code: str | None = Field(None, description="Booking confirmation code")
@@ -60,7 +65,9 @@ class CarShareBooking(BaseModel):
     total_price: str | None = Field(None, description="Total price with currency")
 
     # Email metadata
-    email_received_at: datetime | None = Field(None, description="When email was received")
+    email_received_at: datetime | None = Field(
+        None, description="When email was received"
+    )
 
     @property
     def duration_hours(self) -> float:
@@ -90,7 +97,7 @@ def get_provider_from_domain(domain: str) -> CarShareProvider | None:
     }
 
     for provider_domain, provider in domain_mapping.items():
-        if domain == provider_domain or domain.endswith('.' + provider_domain):
+        if domain == provider_domain or domain.endswith("." + provider_domain):
             return provider
 
     return None

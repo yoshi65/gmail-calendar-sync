@@ -26,7 +26,9 @@ class GmailClient:
     def _get_service(self) -> Any:
         """Get Gmail API service."""
         if self._service is None:
-            client_id, client_secret, refresh_token = self.settings.get_gmail_credentials()
+            client_id, client_secret, refresh_token = (
+                self.settings.get_gmail_credentials()
+            )
 
             credentials = Credentials(
                 token=None,
@@ -50,7 +52,7 @@ class GmailClient:
         since_days: int | None = None,
         since_hours: int | None = None,
         start_date: str | None = None,
-        end_date: str | None = None
+        end_date: str | None = None,
     ) -> list[str]:
         """Search for emails and return message IDs."""
         try:
@@ -66,7 +68,9 @@ class GmailClient:
                         query = f"{query} after:{formatted_start}"
                     except ValueError as e:
                         logger.error("Invalid start_date format", start_date=start_date)
-                        raise ValueError(f"Invalid start_date format: {start_date}. Use YYYY-MM-DD") from e
+                        raise ValueError(
+                            f"Invalid start_date format: {start_date}. Use YYYY-MM-DD"
+                        ) from e
 
                 if end_date:
                     # Validate and format end date (YYYY-MM-DD -> YYYY/MM/DD)
@@ -76,29 +80,40 @@ class GmailClient:
                         query = f"{query} before:{formatted_end}"
                     except ValueError as e:
                         logger.error("Invalid end_date format", end_date=end_date)
-                        raise ValueError(f"Invalid end_date format: {end_date}. Use YYYY-MM-DD") from e
+                        raise ValueError(
+                            f"Invalid end_date format: {end_date}. Use YYYY-MM-DD"
+                        ) from e
 
             elif since_hours:
                 # Convert hours to datetime and use for filtering
                 since_datetime = datetime.now() - timedelta(hours=since_hours)
                 date_filter = since_datetime.strftime("%Y/%m/%d")
                 query = f"{query} after:{date_filter}"
-                logger.debug("Using hours-based filter", since_hours=since_hours, date_filter=date_filter)
+                logger.debug(
+                    "Using hours-based filter",
+                    since_hours=since_hours,
+                    date_filter=date_filter,
+                )
 
             elif since_days:
                 # Fallback to relative days if no other time filters specified
                 since_date = datetime.now() - timedelta(days=since_days)
                 date_filter = since_date.strftime("%Y/%m/%d")
                 query = f"{query} after:{date_filter}"
-                logger.debug("Using days-based filter", since_days=since_days, date_filter=date_filter)
+                logger.debug(
+                    "Using days-based filter",
+                    since_days=since_days,
+                    date_filter=date_filter,
+                )
 
             logger.info("Searching emails", query=query, max_results=max_results)
 
-            result = service.users().messages().list(
-                userId="me",
-                q=query,
-                maxResults=max_results
-            ).execute()
+            result = (
+                service.users()
+                .messages()
+                .list(userId="me", q=query, maxResults=max_results)
+                .execute()
+            )
 
             messages = result.get("messages", [])
             message_ids = [msg["id"] for msg in messages]
@@ -115,14 +130,17 @@ class GmailClient:
         try:
             service = self._get_service()
 
-            message = service.users().messages().get(
-                userId="me",
-                id=message_id,
-                format="full"
-            ).execute()
+            message = (
+                service.users()
+                .messages()
+                .get(userId="me", id=message_id, format="full")
+                .execute()
+            )
 
             # Extract email data
-            headers = {h["name"].lower(): h["value"] for h in message["payload"]["headers"]}
+            headers = {
+                h["name"].lower(): h["value"] for h in message["payload"]["headers"]
+            }
 
             subject = headers.get("subject", "")
             sender = headers.get("from", "")
@@ -134,11 +152,16 @@ class GmailClient:
                 try:
                     # Parse RFC 2822 date format
                     import email.utils
+
                     timestamp = email.utils.parsedate_tz(date_str)
                     if timestamp:
-                        received_at = datetime.fromtimestamp(email.utils.mktime_tz(timestamp))
+                        received_at = datetime.fromtimestamp(
+                            email.utils.mktime_tz(timestamp)
+                        )
                 except Exception as e:
-                    logger.warning("Failed to parse email date", date_str=date_str, error=str(e))
+                    logger.warning(
+                        "Failed to parse email date", date_str=date_str, error=str(e)
+                    )
 
             # Extract body
             body = self._extract_body(message["payload"])
@@ -169,22 +192,30 @@ class GmailClient:
             for part in payload["parts"]:
                 if part["mimeType"] == "text/plain":
                     if "data" in part["body"]:
-                        body += base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
+                        body += base64.urlsafe_b64decode(part["body"]["data"]).decode(
+                            "utf-8"
+                        )
                 elif part["mimeType"] == "text/html" and not body:
                     # Use HTML if no plain text found
                     if "data" in part["body"]:
-                        html_body = base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8")
+                        html_body = base64.urlsafe_b64decode(
+                            part["body"]["data"]
+                        ).decode("utf-8")
                         # Simple HTML to text conversion
                         import re
-                        body = re.sub(r'<[^>]+>', '', html_body)
+
+                        body = re.sub(r"<[^>]+>", "", html_body)
         else:
             # Single part message
             if payload["mimeType"] in ["text/plain", "text/html"]:
                 if "data" in payload["body"]:
-                    body = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
+                    body = base64.urlsafe_b64decode(payload["body"]["data"]).decode(
+                        "utf-8"
+                    )
                     if payload["mimeType"] == "text/html":
                         import re
-                        body = re.sub(r'<[^>]+>', '', body)
+
+                        body = re.sub(r"<[^>]+>", "", body)
 
         return body.strip()
 
@@ -198,16 +229,19 @@ class GmailClient:
 
             # Add label to message
             service.users().messages().modify(
-                userId="me",
-                id=message_id,
-                body={"addLabelIds": [label_id]}
+                userId="me", id=message_id, body={"addLabelIds": [label_id]}
             ).execute()
 
             logger.info("Added label to email", message_id=message_id, label=label_name)
             return True
 
         except HttpError as error:
-            logger.error("Failed to add label", message_id=message_id, label=label_name, error=str(error))
+            logger.error(
+                "Failed to add label",
+                message_id=message_id,
+                label=label_name,
+                error=str(error),
+            )
             return False
 
     def _get_or_create_label(self, label_name: str) -> str:
@@ -228,19 +262,25 @@ class GmailClient:
             label_object = {
                 "name": label_name,
                 "labelListVisibility": "labelShow",
-                "messageListVisibility": "show"
+                "messageListVisibility": "show",
             }
 
-            created_label = service.users().labels().create(
-                userId="me",
-                body=label_object
-            ).execute()
+            created_label = (
+                service.users()
+                .labels()
+                .create(userId="me", body=label_object)
+                .execute()
+            )
 
-            logger.info("Created new label", label=label_name, label_id=created_label["id"])
+            logger.info(
+                "Created new label", label=label_name, label_id=created_label["id"]
+            )
             return created_label["id"]
 
         except HttpError as error:
-            logger.error("Failed to get or create label", label=label_name, error=str(error))
+            logger.error(
+                "Failed to get or create label", label=label_name, error=str(error)
+            )
             raise
 
     def get_flight_emails(
@@ -248,7 +288,7 @@ class GmailClient:
         since_days: int | None = None,
         since_hours: int | None = None,
         start_date: str | None = None,
-        end_date: str | None = None
+        end_date: str | None = None,
     ) -> list[EmailMessage]:
         """Get flight-related emails from supported domains."""
         all_emails = []
@@ -261,7 +301,7 @@ class GmailClient:
                 since_days=since_days,
                 since_hours=since_hours,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
 
             for message_id in message_ids:
@@ -269,7 +309,9 @@ class GmailClient:
                     email_msg = self.get_email(message_id)
                     all_emails.append(email_msg)
                 except Exception as e:
-                    logger.error("Failed to get email", message_id=message_id, error=str(e))
+                    logger.error(
+                        "Failed to get email", message_id=message_id, error=str(e)
+                    )
 
         # Sort emails by received date (oldest first) for proper chronological processing
         all_emails.sort(key=lambda email: email.received_at)
@@ -282,7 +324,7 @@ class GmailClient:
         since_days: int | None = None,
         since_hours: int | None = None,
         start_date: str | None = None,
-        end_date: str | None = None
+        end_date: str | None = None,
     ) -> list[EmailMessage]:
         """Get all supported emails (flight and car sharing) from supported domains."""
         all_emails = []
@@ -295,7 +337,7 @@ class GmailClient:
                 since_days=since_days,
                 since_hours=since_hours,
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
 
             for message_id in message_ids:
@@ -303,7 +345,9 @@ class GmailClient:
                     email_msg = self.get_email(message_id)
                     all_emails.append(email_msg)
                 except Exception as e:
-                    logger.error("Failed to get email", message_id=message_id, error=str(e))
+                    logger.error(
+                        "Failed to get email", message_id=message_id, error=str(e)
+                    )
 
         # Sort emails by received date (oldest first) for proper chronological processing
         all_emails.sort(key=lambda email: email.received_at)
@@ -321,19 +365,19 @@ class GmailClient:
 
             # Remove label from message
             service.users().messages().modify(
-                userId="me",
-                id=message_id,
-                body={"removeLabelIds": [label_id]}
+                userId="me", id=message_id, body={"removeLabelIds": [label_id]}
             ).execute()
 
-            logger.info("Removed label from message",
-                       message_id=message_id,
-                       label=label_name)
+            logger.info(
+                "Removed label from message", message_id=message_id, label=label_name
+            )
             return True
 
         except HttpError as error:
-            logger.error("Failed to remove label from message",
-                        message_id=message_id,
-                        label=label_name,
-                        error=str(error))
+            logger.error(
+                "Failed to remove label from message",
+                message_id=message_id,
+                label=label_name,
+                error=str(error),
+            )
             return False

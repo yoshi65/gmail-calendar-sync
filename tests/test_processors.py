@@ -51,7 +51,7 @@ class TestFlightEmailProcessor:
             sender="noreply@ana.co.jp",
             body="Your flight NH006 is confirmed...",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
     @pytest.fixture
@@ -72,7 +72,7 @@ class TestFlightEmailProcessor:
         return FlightBooking(
             confirmation_code="ABC123",
             passenger_name="Taro Yamada",
-            outbound_segments=[segment]
+            outbound_segments=[segment],
         )
 
     def test_can_process_flight_domain(self, processor, sample_email):
@@ -87,7 +87,7 @@ class TestFlightEmailProcessor:
             sender="orders@amazon.com",
             body="Your order is confirmed",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         assert processor.can_process(email) is False
@@ -113,7 +113,9 @@ class TestFlightEmailProcessor:
 
         assert result is None
 
-    def test_create_calendar_events(self, processor, sample_email, sample_flight_booking):
+    def test_create_calendar_events(
+        self, processor, sample_email, sample_flight_booking
+    ):
         """Test calendar event creation."""
         extracted_data = sample_flight_booking.model_dump()
 
@@ -176,7 +178,7 @@ class TestEmailProcessorFactory:
             sender="noreply@ana.co.jp",
             body="Flight confirmed",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         processor = factory.get_processor(email)
@@ -192,7 +194,7 @@ class TestEmailProcessorFactory:
             sender="noreply@share.timescar.jp",
             body="タイムズカーの予約が開始されました",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         processor = factory.get_processor(email)
@@ -208,7 +210,7 @@ class TestEmailProcessorFactory:
             sender="newsletter@example.com",
             body="Newsletter content",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         processor = factory.get_processor(email)
@@ -256,7 +258,7 @@ class TestCarShareEmailProcessor:
             sender="noreply@share.timescar.jp",
             body="タイムズカーの予約が開始されました...",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
     @pytest.fixture
@@ -265,7 +267,7 @@ class TestCarShareEmailProcessor:
         station = StationInfo(
             station_name="新宿ステーション",
             station_address="東京都新宿区1-1-1",
-            station_code="ST001"
+            station_code="ST001",
         )
 
         return CarShareBooking(
@@ -275,7 +277,7 @@ class TestCarShareEmailProcessor:
             user_name="山田太郎",
             start_time=datetime(2024, 1, 15, 10, 0, tzinfo=UTC),
             end_time=datetime(2024, 1, 15, 12, 0, tzinfo=UTC),
-            station=station
+            station=station,
         )
 
     def test_can_process_carshare_domain(self, processor, sample_email):
@@ -290,7 +292,7 @@ class TestCarShareEmailProcessor:
             sender="orders@amazon.com",
             body="Your order is confirmed",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         assert processor.can_process(email) is False
@@ -303,15 +305,19 @@ class TestCarShareEmailProcessor:
             sender="info@carshares.jp",
             body="カーシェアの予約が確認されました",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         assert processor.can_process(email) is True
 
-    def test_extract_data_success(self, processor, sample_email, sample_carshare_booking):
+    def test_extract_data_success(
+        self, processor, sample_email, sample_carshare_booking
+    ):
         """Test successful data extraction."""
         # Mock OpenAI client to return carshare booking
-        processor.openai_client.extract_carshare_info.return_value = sample_carshare_booking
+        processor.openai_client.extract_carshare_info.return_value = (
+            sample_carshare_booking
+        )
 
         result = processor.extract_data(sample_email)
 
@@ -353,7 +359,9 @@ class TestCarShareEmailProcessor:
         assert result.success is False
         assert result.error_message == "No car sharing information found in email"
 
-    def test_process_cancelled_booking(self, processor, sample_email, sample_carshare_booking):
+    def test_process_cancelled_booking(
+        self, processor, sample_email, sample_carshare_booking
+    ):
         """Test processing cancelled booking."""
         # Create cancelled booking
         cancelled_booking = sample_carshare_booking.model_copy()
@@ -361,7 +369,9 @@ class TestCarShareEmailProcessor:
 
         # Mock extract_data and create_calendar_events
         processor.extract_data = Mock(return_value=cancelled_booking.model_dump())
-        processor.create_calendar_events = Mock(return_value=[])  # Empty list for cancelled
+        processor.create_calendar_events = Mock(
+            return_value=[]
+        )  # Empty list for cancelled
 
         result = processor.process(sample_email)
 
@@ -377,7 +387,7 @@ class TestCarShareEmailProcessor:
             sender="campaign@share.timescar.jp",
             body="期間限定キャンペーン実施中！詳しくはこちら",
             received_at=datetime.now(),
-            thread_id="thread123"
+            thread_id="thread123",
         )
 
         result = processor.process(promotional_email)
@@ -385,7 +395,9 @@ class TestCarShareEmailProcessor:
         assert result.success is False
         assert result.error_message == "Skipped promotional email"
 
-    def test_create_calendar_events_reserved_booking(self, processor, sample_email, sample_carshare_booking):
+    def test_create_calendar_events_reserved_booking(
+        self, processor, sample_email, sample_carshare_booking
+    ):
         """Test calendar event creation for reserved booking."""
         extracted_data = sample_carshare_booking.model_dump()
 
@@ -399,7 +411,9 @@ class TestCarShareEmailProcessor:
         assert events[0].summary == "🚗 新宿ステーション"
         assert events[0].source_email_id == "msg123"
 
-    def test_create_calendar_events_cancelled_booking(self, processor, sample_email, sample_carshare_booking):
+    def test_create_calendar_events_cancelled_booking(
+        self, processor, sample_email, sample_carshare_booking
+    ):
         """Test calendar event handling for cancelled booking."""
         # Create cancelled booking
         cancelled_booking = sample_carshare_booking.model_copy()
@@ -416,7 +430,9 @@ class TestCarShareEmailProcessor:
         # Should return empty list for cancelled booking
         assert len(events) == 0
         # Should have called delete_event
-        processor.calendar_client.delete_event.assert_called_once_with("existing_event_id")
+        processor.calendar_client.delete_event.assert_called_once_with(
+            "existing_event_id"
+        )
 
     def test_find_overlapping_events(self, processor, sample_carshare_booking):
         """Test finding overlapping events."""
@@ -432,26 +448,24 @@ class TestCarShareEmailProcessor:
             "location": "新宿ステーション",
             "start": {"dateTime": "2024-01-15T09:30:00Z"},
             "end": {"dateTime": "2024-01-15T11:30:00Z"},
-            "extendedProperties": {
-                "private": {"source": "gmail-calendar-sync"}
-            }
+            "extendedProperties": {"private": {"source": "gmail-calendar-sync"}},
         }
 
-        mock_service.events().list().execute.return_value = {
-            "items": [mock_event]
-        }
+        mock_service.events().list().execute.return_value = {"items": [mock_event]}
 
         overlapping = processor.find_overlapping_events(sample_carshare_booking)
 
         assert len(overlapping) == 1
         assert overlapping[0]["id"] == "existing_event"
 
-    def test_handle_overlapping_events(self, processor, sample_email, sample_carshare_booking):
+    def test_handle_overlapping_events(
+        self, processor, sample_email, sample_carshare_booking
+    ):
         """Test handling overlapping events."""
         # Mock overlapping events
         overlapping_events = [
             {"id": "old_event_1", "summary": "Old booking 1"},
-            {"id": "old_event_2", "summary": "Old booking 2"}
+            {"id": "old_event_2", "summary": "Old booking 2"},
         ]
 
         # Mock new events

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class CalendarEvent(BaseModel):
     """Google Calendar event data."""
+
     summary: str = Field(..., description="Event title")
     description: str | None = Field(None, description="Event description")
     start_time: datetime = Field(..., description="Event start time")
@@ -23,46 +24,50 @@ class CalendarEvent(BaseModel):
     def to_google_calendar_format(self) -> dict[str, Any]:
         """Convert to Google Calendar API format."""
         event_data = {
-            'summary': self.summary,
-            'start': {
-                'dateTime': self.start_time.isoformat(),
-                'timeZone': str(self.start_time.tzinfo) if self.start_time.tzinfo else 'UTC',
+            "summary": self.summary,
+            "start": {
+                "dateTime": self.start_time.isoformat(),
+                "timeZone": str(self.start_time.tzinfo)
+                if self.start_time.tzinfo
+                else "UTC",
             },
-            'end': {
-                'dateTime': self.end_time.isoformat(),
-                'timeZone': str(self.end_time.tzinfo) if self.end_time.tzinfo else 'UTC',
+            "end": {
+                "dateTime": self.end_time.isoformat(),
+                "timeZone": str(self.end_time.tzinfo)
+                if self.end_time.tzinfo
+                else "UTC",
             },
         }
 
         if self.description:
-            event_data['description'] = self.description
+            event_data["description"] = self.description
 
         if self.location:
-            event_data['location'] = self.location
+            event_data["location"] = self.location
 
         # Add source metadata
         private_props: dict[str, str] = {
-            'source': 'gmail-calendar-sync',
-            'source_email_id': self.source_email_id,
+            "source": "gmail-calendar-sync",
+            "source_email_id": self.source_email_id,
         }
 
         if self.confirmation_code:
-            private_props['confirmation_code'] = self.confirmation_code
+            private_props["confirmation_code"] = self.confirmation_code
 
         if self.booking_reference:
-            private_props['booking_reference'] = self.booking_reference
+            private_props["booking_reference"] = self.booking_reference
 
         if self.seat_number:
-            private_props['seat_number'] = self.seat_number
+            private_props["seat_number"] = self.seat_number
 
-        event_data['extendedProperties'] = {
-            'private': private_props
-        }
+        event_data["extendedProperties"] = {"private": private_props}
 
         return event_data
 
 
-def create_carshare_events(carshare_booking: Any, source_email_id: str) -> list[CalendarEvent]:
+def create_carshare_events(
+    carshare_booking: Any, source_email_id: str
+) -> list[CalendarEvent]:
     """Create calendar events from car sharing booking."""
     from .carshare import BookingStatus, CarShareBooking
 
@@ -74,7 +79,7 @@ def create_carshare_events(carshare_booking: Any, source_email_id: str) -> list[
     # Create car sharing event
     provider_name = {
         "mitsui_carshares": "三井のカーシェアーズ",
-        "times_car": "Times Car"
+        "times_car": "Times Car",
     }.get(carshare_booking.provider, carshare_booking.provider.title())
 
     # Create summary with status
@@ -82,7 +87,7 @@ def create_carshare_events(carshare_booking: Any, source_email_id: str) -> list[
         BookingStatus.RESERVED: "🚗",
         BookingStatus.CHANGED: "🔄",
         BookingStatus.CANCELLED: "❌",
-        BookingStatus.COMPLETED: "✅"
+        BookingStatus.COMPLETED: "✅",
     }.get(carshare_booking.status, "🚗")
 
     summary = f"{status_emoji} {carshare_booking.station.station_name}"
@@ -137,7 +142,9 @@ def create_carshare_events(carshare_booking: Any, source_email_id: str) -> list[
     return events
 
 
-def create_flight_events(flight_booking: Any, source_email_id: str) -> list[CalendarEvent]:
+def create_flight_events(
+    flight_booking: Any, source_email_id: str
+) -> list[CalendarEvent]:
     """Create calendar events from flight booking."""
     from .flight import FlightBooking
 
@@ -149,12 +156,16 @@ def create_flight_events(flight_booking: Any, source_email_id: str) -> list[Cale
     # Create outbound flight events
     for _i, segment in enumerate(flight_booking.outbound_segments):
         # Use city name if available, otherwise airport name, fallback to code
-        departure_name = (segment.departure_airport.city or
-                         segment.departure_airport.name or
-                         segment.departure_airport.code)
-        arrival_name = (segment.arrival_airport.city or
-                       segment.arrival_airport.name or
-                       segment.arrival_airport.code)
+        departure_name = (
+            segment.departure_airport.city
+            or segment.departure_airport.name
+            or segment.departure_airport.code
+        )
+        arrival_name = (
+            segment.arrival_airport.city
+            or segment.arrival_airport.name
+            or segment.arrival_airport.code
+        )
 
         # Remove "Airport" suffix if present for cleaner display
         departure_name = departure_name.replace(" Airport", "").replace("空港", "")
@@ -170,7 +181,9 @@ def create_flight_events(flight_booking: Any, source_email_id: str) -> list[Cale
         ]
 
         if flight_booking.booking_reference:
-            description_parts.append(f"Booking Reference: {flight_booking.booking_reference}")
+            description_parts.append(
+                f"Booking Reference: {flight_booking.booking_reference}"
+            )
 
         if segment.seat_number:
             description_parts.append(f"Seat: {segment.seat_number}")
@@ -198,12 +211,16 @@ def create_flight_events(flight_booking: Any, source_email_id: str) -> list[Cale
     # Create return flight events
     for _i, segment in enumerate(flight_booking.return_segments):
         # Use city name if available, otherwise airport name, fallback to code
-        departure_name = (segment.departure_airport.city or
-                         segment.departure_airport.name or
-                         segment.departure_airport.code)
-        arrival_name = (segment.arrival_airport.city or
-                       segment.arrival_airport.name or
-                       segment.arrival_airport.code)
+        departure_name = (
+            segment.departure_airport.city
+            or segment.departure_airport.name
+            or segment.departure_airport.code
+        )
+        arrival_name = (
+            segment.arrival_airport.city
+            or segment.arrival_airport.name
+            or segment.arrival_airport.code
+        )
 
         # Remove "Airport" suffix if present for cleaner display
         departure_name = departure_name.replace(" Airport", "").replace("空港", "")
@@ -219,7 +236,9 @@ def create_flight_events(flight_booking: Any, source_email_id: str) -> list[Cale
         ]
 
         if flight_booking.booking_reference:
-            description_parts.append(f"Booking Reference: {flight_booking.booking_reference}")
+            description_parts.append(
+                f"Booking Reference: {flight_booking.booking_reference}"
+            )
 
         if segment.seat_number:
             description_parts.append(f"Seat: {segment.seat_number}")

@@ -27,7 +27,9 @@ class OpenAIClient:
         self.settings = settings
         self.client = OpenAI(api_key=settings.openai_api_key)
 
-    def extract_flight_info(self, email_content: str, email_subject: str = "") -> FlightBooking | None:
+    def extract_flight_info(
+        self, email_content: str, email_subject: str = ""
+    ) -> FlightBooking | None:
         """Extract flight booking information from email content."""
         system_prompt = """You are an expert at extracting flight booking information from emails.
 
@@ -86,16 +88,18 @@ Email Content:
 Extract the flight booking information from this email and return it as JSON."""
 
         try:
-            logger.info("Extracting flight info from email", subject=email_subject[:100])
+            logger.info(
+                "Extracting flight info from email", subject=email_subject[:100]
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.1,
-                max_tokens=2000
+                max_tokens=2000,
             )
 
             content = response.choices[0].message.content
@@ -109,24 +113,32 @@ Extract the flight booking information from this email and return it as JSON."""
             try:
                 # Remove markdown code blocks if present
                 if content.startswith("```json"):
-                    content = content.replace("```json\n", "").replace("```", "").strip()
+                    content = (
+                        content.replace("```json\n", "").replace("```", "").strip()
+                    )
                 elif content.startswith("```"):
                     content = content.replace("```\n", "").replace("```", "").strip()
 
                 flight_data = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error("Failed to parse OpenAI JSON response", error=str(e), content=content)
+                logger.error(
+                    "Failed to parse OpenAI JSON response",
+                    error=str(e),
+                    content=content,
+                )
                 return None
 
             # Convert to FlightBooking model
             flight_booking = self._convert_to_flight_booking(flight_data)
 
             if flight_booking:
-                logger.info("Successfully extracted flight booking",
-                           confirmation_code=flight_booking.confirmation_code,
-                           passenger=flight_booking.passenger_name,
-                           outbound_segments=len(flight_booking.outbound_segments),
-                           return_segments=len(flight_booking.return_segments))
+                logger.info(
+                    "Successfully extracted flight booking",
+                    confirmation_code=flight_booking.confirmation_code,
+                    passenger=flight_booking.passenger_name,
+                    outbound_segments=len(flight_booking.outbound_segments),
+                    return_segments=len(flight_booking.return_segments),
+                )
 
             return flight_booking
 
@@ -161,14 +173,18 @@ Extract the flight booking information from this email and return it as JSON."""
                 try:
                     booking_date = datetime.fromisoformat(data["booking_date"])
                 except ValueError:
-                    logger.warning("Invalid booking date format", date=data["booking_date"])
+                    logger.warning(
+                        "Invalid booking date format", date=data["booking_date"]
+                    )
 
             checkin_opens = None
             if data.get("checkin_opens"):
                 try:
                     checkin_opens = datetime.fromisoformat(data["checkin_opens"])
                 except ValueError:
-                    logger.warning("Invalid checkin opens date format", date=data["checkin_opens"])
+                    logger.warning(
+                        "Invalid checkin opens date format", date=data["checkin_opens"]
+                    )
 
             flight_booking = FlightBooking(
                 confirmation_code=data["confirmation_code"],
@@ -188,7 +204,9 @@ Extract the flight booking information from this email and return it as JSON."""
             logger.error("Failed to convert flight data", error=str(e), data=data)
             return None
 
-    def _create_flight_segment(self, segment_data: dict[str, Any]) -> FlightSegment | None:
+    def _create_flight_segment(
+        self, segment_data: dict[str, Any]
+    ) -> FlightSegment | None:
         """Create FlightSegment from extracted data."""
         try:
             # Parse airports
@@ -225,10 +243,16 @@ Extract the flight booking information from this email and return it as JSON."""
             return segment
 
         except Exception as e:
-            logger.error("Failed to create flight segment", error=str(e), segment_data=segment_data)
+            logger.error(
+                "Failed to create flight segment",
+                error=str(e),
+                segment_data=segment_data,
+            )
             return None
 
-    def extract_carshare_info(self, email_content: str, email_subject: str = "", provider: str = "") -> CarShareBooking | None:
+    def extract_carshare_info(
+        self, email_content: str, email_subject: str = "", provider: str = ""
+    ) -> CarShareBooking | None:
         """Extract car sharing booking information from email content."""
         system_prompt = """You are an expert at extracting car sharing booking information from emails.
 
@@ -281,18 +305,20 @@ Email Content:
 Extract the car sharing booking information from this email and return it as JSON."""
 
         try:
-            logger.info("Extracting car sharing info from email",
-                       subject=email_subject[:100],
-                       provider=provider)
+            logger.info(
+                "Extracting car sharing info from email",
+                subject=email_subject[:100],
+                provider=provider,
+            )
 
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.1,
-                max_tokens=2000
+                max_tokens=2000,
             )
 
             content = response.choices[0].message.content
@@ -306,25 +332,35 @@ Extract the car sharing booking information from this email and return it as JSO
             try:
                 # Remove markdown code blocks if present
                 if content.startswith("```json"):
-                    content = content.replace("```json\n", "").replace("```", "").strip()
+                    content = (
+                        content.replace("```json\n", "").replace("```", "").strip()
+                    )
                 elif content.startswith("```"):
                     content = content.replace("```\n", "").replace("```", "").strip()
 
                 carshare_data = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error("Failed to parse OpenAI JSON response", error=str(e), content=content)
+                logger.error(
+                    "Failed to parse OpenAI JSON response",
+                    error=str(e),
+                    content=content,
+                )
                 return None
 
             # Convert to CarShareBooking model
-            carshare_booking = self._convert_to_carshare_booking(carshare_data, provider)
+            carshare_booking = self._convert_to_carshare_booking(
+                carshare_data, provider
+            )
 
             if carshare_booking:
-                logger.info("Successfully extracted car sharing booking",
-                           booking_reference=carshare_booking.booking_reference,
-                           user_name=carshare_booking.user_name,
-                           provider=carshare_booking.provider,
-                           status=carshare_booking.status,
-                           station=carshare_booking.station.station_name)
+                logger.info(
+                    "Successfully extracted car sharing booking",
+                    booking_reference=carshare_booking.booking_reference,
+                    user_name=carshare_booking.user_name,
+                    provider=carshare_booking.provider,
+                    status=carshare_booking.status,
+                    station=carshare_booking.station.station_name,
+                )
 
             return carshare_booking
 
@@ -332,7 +368,9 @@ Extract the car sharing booking information from this email and return it as JSO
             logger.error("Failed to extract car sharing info", error=str(e))
             return None
 
-    def _convert_to_carshare_booking(self, data: dict[str, Any], provider: str) -> CarShareBooking | None:
+    def _convert_to_carshare_booking(
+        self, data: dict[str, Any], provider: str
+    ) -> CarShareBooking | None:
         """Convert extracted data to CarShareBooking model."""
         try:
             # Map provider string to enum
@@ -354,7 +392,9 @@ Extract the car sharing booking information from this email and return it as JSO
                 "completed": BookingStatus.COMPLETED,
             }
 
-            status = status_mapping.get(data.get("status", "reserved"), BookingStatus.RESERVED)
+            status = status_mapping.get(
+                data.get("status", "reserved"), BookingStatus.RESERVED
+            )
 
             # Parse station info
             station_data = data.get("station", {})
@@ -384,7 +424,9 @@ Extract the car sharing booking information from this email and return it as JSO
                 try:
                     booking_date = datetime.fromisoformat(data["booking_date"])
                 except ValueError:
-                    logger.warning("Invalid booking date format", date=data["booking_date"])
+                    logger.warning(
+                        "Invalid booking date format", date=data["booking_date"]
+                    )
 
             # Parse required times
             try:
