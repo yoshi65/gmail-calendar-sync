@@ -35,30 +35,6 @@ jobs:
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      - name: Configure Docker for Artifact Registry
+      - name: Deploy using Cloud Build
         run: |
-          gcloud auth configure-docker asia-northeast1-docker.pkg.dev
-
-      - name: Build and Push Docker Image
-        run: |
-          export PROJECT_ID=$(gcloud config get-value project)
-          export IMAGE_URI=asia-northeast1-docker.pkg.dev/$PROJECT_ID/gmail-calendar-sync/gmail-calendar-sync:$GITHUB_SHA
-          docker build -t $IMAGE_URI .
-          docker push $IMAGE_URI
-
-      - name: Deploy to Cloud Run
-        run: |
-          export PROJECT_ID=$(gcloud config get-value project)
-          export IMAGE_URI=asia-northeast1-docker.pkg.dev/$PROJECT_ID/gmail-calendar-sync/gmail-calendar-sync:$GITHUB_SHA
-          gcloud run deploy gmail-calendar-sync \
-            --image $IMAGE_URI \
-            --region asia-northeast1 \
-            --platform managed \
-            --no-allow-unauthenticated \
-            --memory 512Mi \
-            --cpu 1 \
-            --timeout 900 \
-            --concurrency 1 \
-            --max-instances 1 \
-            --set-env-vars LOG_LEVEL=INFO,SYNC_PERIOD_HOURS=8 \
-            --set-secrets GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN=GOOGLE_REFRESH_TOKEN:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,SLACK_WEBHOOK_URL=SLACK_WEBHOOK_URL:latest
+          gcloud builds submit --config cloudbuild.yaml .
