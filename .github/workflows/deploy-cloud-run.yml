@@ -26,6 +26,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug secrets availability
+        run: |
+          echo "Checking if secrets are available..."
+          echo "GCP_SA_KEY length: ${#GCP_SA_KEY}"
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+
       - name: Google Auth
         id: auth
         uses: 'google-github-actions/auth@v2'
@@ -38,3 +45,5 @@ jobs:
       - name: Deploy using Cloud Build
         run: |
           gcloud builds submit --config cloudbuild.yaml .
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
