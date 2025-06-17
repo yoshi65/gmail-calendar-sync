@@ -1,0 +1,48 @@
+# Cloud Build configuration for Gmail Calendar Sync
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$COMMIT_SHA', '.']
+
+  # Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$COMMIT_SHA']
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+    - 'run'
+    - 'deploy'
+    - 'gmail-calendar-sync'
+    - '--image'
+    - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$COMMIT_SHA'
+    - '--region'
+    - 'asia-northeast1'
+    - '--platform'
+    - 'managed'
+    - '--no-allow-unauthenticated'
+    - '--memory'
+    - '512Mi'
+    - '--cpu'
+    - '1'
+    - '--timeout'
+    - '900'
+    - '--concurrency'
+    - '1'
+    - '--max-instances'
+    - '1'
+    - '--set-env-vars'
+    - 'LOG_LEVEL=INFO,SYNC_PERIOD_HOURS=8,PROJECT_ID=$PROJECT_ID'
+    - '--set-secrets'
+    - 'GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN=GOOGLE_REFRESH_TOKEN:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,SLACK_WEBHOOK_URL=SLACK_WEBHOOK_URL:latest'
+
+images:
+  - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$COMMIT_SHA'
+
+# Substitution variables
+substitutions:
+  _ARTIFACT_REGISTRY_URL: 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/gmail-calendar-sync'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

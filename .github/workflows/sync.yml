@@ -10,29 +10,29 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     environment: production
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v3
       with:
         version: "latest"
-    
+
     - name: Install dependencies
-      run: uv sync
-    
+      run: uv sync --all-extras
+
     - name: Run type check
       run: uv run mypy src/
-    
+
     - name: Run linter
       run: uv run ruff check src/
-    
+
     - name: Run Gmail Calendar Sync
       env:
         # Unified Google API credentials (recommended)
@@ -54,7 +54,7 @@ jobs:
         SYNC_PERIOD_DAYS: ${{ vars.SYNC_PERIOD_DAYS || '30' }}
         LOG_LEVEL: INFO
       run: uv run python -m src.main
-    
+
     - name: Notify on failure
       if: failure()
       uses: 8398a7/action-slack@v3
