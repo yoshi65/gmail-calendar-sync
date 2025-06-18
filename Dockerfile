@@ -21,20 +21,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Install Python dependencies
-RUN uv sync --frozen --no-cache
+RUN uv sync --frozen --no-cache --verbose
 
 # Copy application code
 COPY src/ ./src/
-COPY .env.example ./
-
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
-USER appuser
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import src.main; print('Health check passed')"
 
 # Set default command
 CMD ["uv", "run", "python", "-m", "src.main"]
