@@ -37,4 +37,5 @@ jobs:
 
       - name: Deploy using Cloud Build
         run: |
-          gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7} .
+          SERVICE_ACCOUNT_EMAIL=$(echo '${{ secrets.GCP_SA_KEY }}' | jq -r '.client_email')
+          gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7},_SERVICE_ACCOUNT_EMAIL=$SERVICE_ACCOUNT_EMAIL .

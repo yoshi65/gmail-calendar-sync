@@ -26,9 +26,8 @@ steps:
     args:
     - '-c'
     - |
-      # Get the current service account (CI用のサービスアカウント)
-      CURRENT_SA=$$(gcloud config get-value account)
-      echo "Using service account: $$CURRENT_SA"
+      # Use the service account passed from GitHub Actions
+      echo "Using service account: ${_SERVICE_ACCOUNT_EMAIL}"
 
       # Check if job exists and create or update accordingly
       if gcloud run jobs describe gmail-calendar-sync-job --region=asia-northeast1 > /dev/null 2>&1; then
@@ -36,7 +35,7 @@ steps:
         gcloud run jobs update gmail-calendar-sync-job \
           --image=${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA \
           --region=asia-northeast1 \
-          --service-account=$$CURRENT_SA \
+          --service-account=${_SERVICE_ACCOUNT_EMAIL} \
           --memory=512Mi \
           --cpu=1 \
           --task-timeout=900 \
@@ -48,7 +47,7 @@ steps:
         gcloud run jobs create gmail-calendar-sync-job \
           --image=${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA \
           --region=asia-northeast1 \
-          --service-account=$$CURRENT_SA \
+          --service-account=${_SERVICE_ACCOUNT_EMAIL} \
           --memory=512Mi \
           --cpu=1 \
           --task-timeout=900 \
@@ -63,6 +62,7 @@ images:
 # Substitution variables
 substitutions:
   _ARTIFACT_REGISTRY_URL: 'asia-northeast1-docker.pkg.dev/${PROJECT_ID}/gmail-calendar-sync'
+  _SERVICE_ACCOUNT_EMAIL: 'placeholder@example.com'  # Will be overridden by GitHub Actions
 
 options:
   dynamicSubstitutions: true
