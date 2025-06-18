@@ -37,5 +37,4 @@ jobs:
 
       - name: Deploy using Cloud Build
         run: |
-          PROJECT_ID=$(gcloud config get-value project)
-          gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7},PROJECT_ID=$PROJECT_ID .
+          gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7} .
