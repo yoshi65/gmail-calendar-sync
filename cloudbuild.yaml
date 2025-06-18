@@ -14,11 +14,11 @@ steps:
 
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:${SHORT_SHA}', '.']
+    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '.']
 
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:${SHORT_SHA}']
+    args: ['push', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA']
 
   # Deploy container image to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -28,7 +28,7 @@ steps:
     - 'deploy'
     - 'gmail-calendar-sync'
     - '--image'
-    - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:${SHORT_SHA}'
+    - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA'
     - '--region'
     - 'asia-northeast1'
     - '--platform'
@@ -50,7 +50,7 @@ steps:
     - 'GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_REFRESH_TOKEN=GOOGLE_REFRESH_TOKEN:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,SLACK_WEBHOOK_URL=SLACK_WEBHOOK_URL:latest'
 
 images:
-  - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:${SHORT_SHA}'
+  - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA'
 
 # Substitution variables
 substitutions:

@@ -37,4 +37,4 @@ jobs:
 
       - name: Deploy using Cloud Build
         run: |
-          gcloud builds submit --config cloudbuild.yaml .
+          gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7} .
