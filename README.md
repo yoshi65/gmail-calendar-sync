@@ -2,11 +2,11 @@
 
 ✈️🚗 航空券・カーシェア予約メールを自動的にGoogle Calendarの予定として追加するPythonアプリケーション
 
-![GitHub Actions](https://img.shields.io/github/actions/workflow/status/yoshi65/gmail-calendar-sync/sync.yml?branch=main)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Cloud Run](https://img.shields.io/badge/deploy-Cloud%20Run%20Jobs-blue)
 
-OpenAI APIを使用してメール内容を自動解析し、GitHub Actionsで6時間ごとに定期実行されます。
+OpenAI APIを使用してメール内容を自動解析し、Cloud Run Jobsで定期実行されます。
 
 ## 🚀 主な機能
 
@@ -103,11 +103,11 @@ pip install -e .
    # .envファイルにクライアント情報を設定
    echo "GOOGLE_CLIENT_ID=your_client_id" >> .env
    echo "GOOGLE_CLIENT_SECRET=your_client_secret" >> .env
-   
+
    # リフレッシュトークン取得スクリプトを実行
    uv run python get_refresh_token.py
    ```
-   
+
    ブラウザが開くのでGoogleアカウントで認証し、表示されたリフレッシュトークンを`.env`に追加してください。
 
 #### OpenAI API
@@ -180,27 +180,28 @@ SYNC_START_DATE=2024-01-01 uv run python src/main.py
 SYNC_PERIOD_DAYS=7 LOG_LEVEL=DEBUG uv run python src/main.py
 ```
 
-### GitHub Actions自動実行
+### Cloud Run Jobs実行
 
-1. **Environment設定**
+1. **デプロイ**
+   - mainブランチへのpushで自動デプロイ
+   - Cloud BuildでContainer imageをビルド
+   - Cloud Run Jobsに自動配布
+
+2. **手動実行**
+   ```bash
+   gcloud run jobs execute gmail-calendar-sync-job --region=asia-northeast1
    ```
-   Settings > Environments > New environment: "production"
-   Protected branches: main
-   ```
 
-2. **Secrets設定**
-   - `GMAIL_CLIENT_ID`
-   - `GMAIL_CLIENT_SECRET` 
-   - `GMAIL_REFRESH_TOKEN`
-   - `CALENDAR_CLIENT_ID`
-   - `CALENDAR_CLIENT_SECRET`
-   - `CALENDAR_REFRESH_TOKEN`
-   - `OPENAI_API_KEY`
-   - `SLACK_WEBHOOK_URL` (オプション)
+3. **定期実行**
+   - Cloud Schedulerで6時間ごと自動実行
+   - タイムゾーン: Asia/Tokyo
+   - リトライ: 最大3回、タイムアウト: 30分
 
-3. **自動実行**
-   - 6時間ごと自動実行
-   - 手動実行: Actions > "Gmail Calendar Sync" > "Run workflow"
+### 実行フロー
+1. **Cloud Scheduler** → Cloud Run Jobs API呼び出し
+2. **OAuth認証** → サービスアカウントによる認証
+3. **Secret Manager** → 環境変数の安全な取得
+4. **同期処理実行** → Gmail解析 + Calendar更新
 
 ## 🧪 開発・テスト
 
@@ -238,7 +239,7 @@ uv run mypy src/
 # リンター
 uv run ruff check src/
 
-# フォーマッター  
+# フォーマッター
 uv run ruff format src/
 
 # 自動修正
@@ -322,12 +323,12 @@ src/
 ```
 📧 Gmail Calendar Sync Summary
 ✅ Processed: 5
-❌ Failed: 0  
+❌ Failed: 0
 📊 Total emails: 5
 
 Flight confirmations added to calendar:
 • ANA NH006 (2024-01-15)
-• JAL JL001 (2024-02-01) 
+• JAL JL001 (2024-02-01)
 • ANA NH007 (2024-01-20)
 
 Car sharing bookings added to calendar:
@@ -445,7 +446,7 @@ uv run python cleanup_for_test.py
   ❌ 悪い例: "予約番号を抽出してください"
   ✅ 良い例: "「確認番号」ラベルの後に続く6桁以上の数字のみを確認番号として抽出"
   ```
-  
+
 - **フォールバック戦略**: 複数の識別子（確認番号→予約番号）で堅牢性を確保
   - 主キー（確認番号）が取得できない場合の代替手段を用意
   - 航空券とカーシェアで異なる重複検出ロジックを実装
@@ -493,7 +494,7 @@ uv run python cleanup_for_test.py
       )
   ```
 
-- **包括的なテストスイート**: 
+- **包括的なテストスイート**:
   - **モデルテスト**: データ検証・プロパティ計算の正確性
   - **プロセッサーテスト**: メール処理ロジック・エラーハンドリング
   - **統合テスト**: プロモーション除外・重複検出の動作確認
@@ -505,12 +506,12 @@ uv run python cleanup_for_test.py
 
 #### **6. 拡張性を考慮した設計**
 
-- **新しいメール種別の追加が容易**: 
+- **新しいメール種別の追加が容易**:
   1. モデル定義（`src/models/新種別.py`）
   2. プロセッサー実装（`src/processors/新種別_processor.py`）
   3. ファクトリー登録（`factory.py`に1行追加）
   4. **テスト追加** (`tests/test_models.py`, `tests/test_processors.py`) ⚠️ 重要
-  
+
 - **設定の外部化**: ドメインリスト・API設定を簡単に変更可能
 
 - **API抽象化**: Gmail/Calendar/OpenAI クライアントを独立させ、差し替え容易
@@ -525,7 +526,7 @@ uv run python cleanup_for_test.py
 
 #### **8. セキュリティベストプラクティス**
 
-- **個人情報保護**: 
+- **個人情報保護**:
   - 本番環境では自動マスキング
   - デバッグ時のローカル実行を徹底
   - GitHub Actionsでの機密情報をSecrets管理
@@ -561,7 +562,7 @@ uv run python cleanup_for_test.py
 
 **技術的成果**:
 - **43%** テストカバレッジ (1169行中)
-- **100%** カーシェアモデルカバレッジ 
+- **100%** カーシェアモデルカバレッジ
 - **0エラー** 静的解析 (ruff, mypy)
 - **Python 3.11/3.12** マトリックステスト対応
 

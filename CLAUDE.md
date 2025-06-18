@@ -10,7 +10,8 @@ GmailからOpenAI APIを使用してメール内容を解析し、航空券予�
 - **.claude/**: 個人的なメモ・問題情報（.gitignoreで除外済み）
 
 ## アーキテクチャ
-- **実行環境**: GitHub Actions (6時間ごと定期実行)
+- **実行環境**: Cloud Run Jobs (Cloud Schedulerで定期実行)
+- **デプロイ**: GitHub Actions + Cloud Build
 - **言語**: Python 3.11+
 - **パッケージ管理**: uv
 - **LLM**: OpenAI API (gpt-3.5-turbo)
@@ -24,7 +25,7 @@ GmailからOpenAI APIを使用してメール内容を解析し、航空券予�
 ✅ **エラーハンドリング**: 構造化ログとSlack通知
 ✅ **型安全性**: 全コンポーネントでPydantic型定義
 ✅ **テスト**: 基本的な単体テストカバレッジ
-✅ **CI/CD**: GitHub Actionsワークフロー完備
+✅ **CI/CD**: GitHub Actions + Cloud Build + Cloud Run Jobs
 
 ## プロジェクト構造
 ```
@@ -104,9 +105,13 @@ SYNC_PERIOD_DAYS=30  # 同期対象期間
 - ✅ CI/CDパイプライン (型チェック・リンター統合)
 - ✅ 宣伝メールフィルタ（OpenAI API送信前の自動除外）
 - ✅ コスト最適化（不要なOpenAI API呼び出し削減）
+- ✅ Cloud Run Jobs移行（バッチ処理最適化）
 
-### 🔮 Phase 4: 将来拡張 (未実装)
-- [ ] カーシェア予約メール対応
+### ✅ Phase 4: インフラ最適化 (完了)
+- ✅ Cloud Scheduler設定（6時間ごと定期実行）
+- ✅ Cloud Run Jobs完全移行（バッチ処理最適化）
+
+### 🔮 Phase 5: 将来拡張 (未実装)
 - [ ] 飲食店予約メール対応
 - [ ] メール形式の機械学習改善
 - [ ] 複数カレンダー対応
@@ -154,8 +159,16 @@ SLACK_WEBHOOK_URL (オプション)
 ```
 
 ### 3. 運用開始
-- Protected branch (main) でpush → 自動で6時間ごと実行開始
-- 手動実行: GitHub Actions → "Gmail Calendar Sync" → "Run workflow"
+- Protected branch (main) でpush → Cloud Run Jobsが自動デプロイ
+- 手動実行: `gcloud run jobs execute gmail-calendar-sync-job --region=asia-northeast1`
+- 定期実行: Cloud Scheduler設定済み（6時間ごと自動実行）
+
+### 実行フロー詳細
+1. **Cloud Scheduler**: 6時間ごと（0 */6 * * *）にタイマー発火
+2. **Cloud Run Jobs API**: OAuth認証でサービスアカウント使用
+3. **Secret Manager**: 環境変数（API Keys）を安全に取得
+4. **同期処理**: Gmail API → OpenAI API → Calendar API
+5. **Slack通知**: 処理結果をSlackに送信（オプション）
 
 ## トラブルシューティング
 
