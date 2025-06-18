@@ -14,7 +14,7 @@ steps:
 
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '.']
+    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '--progress=plain', '.']
 
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'

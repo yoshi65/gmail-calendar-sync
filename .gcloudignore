@@ -1,0 +1,84 @@
+# Git files
+.git
+.gitignore
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Logs
+*.log
+
+# Local development files
+.env.local
+.env.development
+debug_*.py
+cleanup_*.py
+
+# Don't include service account keys in build (if any)
+**/service-account-key.json
+sakeys/
+
+# GitHub
+.github/
+
+# Documentation (not needed in container)
+*.md
+LICENSE
+SECURITY.md
+CONTRIBUTING.md
+
+# Tests (not needed in container)
+tests/
