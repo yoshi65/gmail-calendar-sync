@@ -74,8 +74,8 @@ sakeys/
 # GitHub
 .github/
 
-# Documentation (not needed in container)
-*.md
+# Documentation (not needed in container, but keep README.md for build)
+CLAUDE.md
 LICENSE
 SECURITY.md
 CONTRIBUTING.md

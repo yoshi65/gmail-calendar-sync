@@ -5,7 +5,6 @@ description = "Sync Gmail flight bookings to Google Calendar using AI"
 authors = [
     {name = "yoshitaka", email = "yoshi65@example.com"}
 ]
-readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0.0",
