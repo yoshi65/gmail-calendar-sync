@@ -4,7 +4,10 @@
     "config:recommended",
     "security:openssf-scorecard",
     ":semanticCommits",
-    ":dependencyDashboard"
+    ":dependencyDashboard",
+    "group:monorepos",
+    "group:recommended",
+    "workarounds:all"
   ],
   "schedule": [
     "after 1am and before 5am on monday"
@@ -71,6 +74,13 @@
       "matchUpdateTypes": ["major"],
       "enabled": true,
       "addLabels": ["dev-tools-update"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      "automergeType": "pr"
     },
     {
       "matchDepTypes": ["devDependencies"],

@@ -1,0 +1,62 @@
+name: Repository Maintenance
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # Weekly on Sunday at 4 AM JST
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete old workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 30
+          keep_minimum_runs: 10
+
+      - name: Clean up old branches
+        run: |
+          # Delete merged branches older than 30 days
+          git fetch --prune
+          git for-each-ref --format '%(refname:short) %(committerdate)' refs/remotes/origin |
+          awk '$2 <= "'$(date -d '30 days ago' -I)'"' |
+          grep -v 'origin/main' |
+          cut -d' ' -f1 |
+          sed 's|origin/||' |
+          xargs -I {} git push origin --delete {} || true
+
+  update-docs:
+    runs-on: ubuntu-latest
+    needs: cleanup
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Generate dependency report
+        run: |
+          uv tree > DEPENDENCIES.md
+          echo "Last updated: $(date)" >> DEPENDENCIES.md
+
+      - name: Commit dependency report
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add DEPENDENCIES.md
+          git diff --staged --quiet || git commit -m "chore: update dependency report [skip ci]"
+          git push || true
