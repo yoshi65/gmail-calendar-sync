@@ -8,7 +8,7 @@ from ..models.flight import FlightBooking
 from ..services.calendar_client import CalendarClient
 from ..services.openai_client import OpenAIClient
 from ..utils.config import Settings
-from ..utils.email_filter import is_promotional_email
+from ..utils.email_filter import is_likely_booking_email, is_promotional_email
 from .base import BaseEmailProcessor
 
 logger = structlog.get_logger()
@@ -41,6 +41,20 @@ class FlightEmailProcessor(BaseEmailProcessor):
         )
 
         try:
+            # Quick check if email is likely a booking email based on subject
+            if not is_likely_booking_email(email):
+                logger.info(
+                    "Skipping non-booking email based on subject",
+                    email_id=email.id,
+                    subject=email.subject[:100],
+                )
+                return ProcessingResult(
+                    email_id=email.id,
+                    email_type=EmailType.FLIGHT,
+                    success=False,
+                    error_message="No flight information found in email",
+                )
+
             # Check if email is promotional before sending to OpenAI
             if is_promotional_email(email):
                 logger.info(

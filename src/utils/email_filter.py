@@ -81,7 +81,7 @@ class EmailFilter:
 
         # Booking confirmation patterns (to avoid false positives)
         self.booking_confirmation_patterns: list[Pattern[str]] = [
-            # Flight booking confirmations
+            # Flight booking confirmations - subject patterns
             re.compile(r"予約.*受付.*ました", re.IGNORECASE),
             re.compile(r"ご予約.*確認", re.IGNORECASE),
             re.compile(r"搭乗券", re.IGNORECASE),
@@ -90,6 +90,21 @@ class EmailFilter:
             re.compile(r"確認番号", re.IGNORECASE),
             re.compile(r"予約番号", re.IGNORECASE),
             re.compile(r"チェックイン", re.IGNORECASE),
+            re.compile(r"eチケット", re.IGNORECASE),
+            re.compile(r"座席.*指定", re.IGNORECASE),
+            re.compile(r"搭乗.*手続", re.IGNORECASE),
+            re.compile(r"予約.*完了", re.IGNORECASE),
+            re.compile(r"ご利用.*ありがとう", re.IGNORECASE),
+            # ANA specific booking patterns
+            re.compile(r"ANA.*予約", re.IGNORECASE),
+            re.compile(r"ANA.*確認", re.IGNORECASE),
+            re.compile(r"ANA.*チケット", re.IGNORECASE),
+            re.compile(r"ANA.*搭乗", re.IGNORECASE),
+            # JAL specific booking patterns
+            re.compile(r"JAL.*予約", re.IGNORECASE),
+            re.compile(r"JAL.*確認", re.IGNORECASE),
+            re.compile(r"JAL.*チケット", re.IGNORECASE),
+            re.compile(r"JAL.*搭乗", re.IGNORECASE),
             # Car sharing booking confirmations
             re.compile(r"利用.*開始", re.IGNORECASE),
             re.compile(r"利用.*終了", re.IGNORECASE),
@@ -98,6 +113,58 @@ class EmailFilter:
             re.compile(r"キャンセル.*受付", re.IGNORECASE),
             re.compile(r"変更.*受付", re.IGNORECASE),
         ]
+
+        # Non-booking subject patterns (obvious non-booking emails)
+        self.non_booking_subject_patterns: list[Pattern[str]] = [
+            # Obvious promotional/newsletter subjects
+            re.compile(r"^.*キャンペーン.*$", re.IGNORECASE),
+            re.compile(r"^.*プレゼント.*$", re.IGNORECASE),
+            re.compile(r"^.*マイル.*キャンペーン.*$", re.IGNORECASE),
+            re.compile(r"^.*ポイント.*キャンペーン.*$", re.IGNORECASE),
+            re.compile(r"^.*お知らせ.*$", re.IGNORECASE),
+            re.compile(r"^.*メルマガ.*$", re.IGNORECASE),
+            re.compile(r"^.*ニュースレター.*$", re.IGNORECASE),
+            re.compile(r"^.*セール.*$", re.IGNORECASE),
+            re.compile(r"^.*割引.*$", re.IGNORECASE),
+            re.compile(r"^.*特典.*$", re.IGNORECASE),
+            # System/service notifications that are clearly not bookings
+            re.compile(r"^.*メンテナンス.*$", re.IGNORECASE),
+            re.compile(r"^.*システム.*$", re.IGNORECASE),
+            re.compile(r"^.*パスワード.*$", re.IGNORECASE),
+            re.compile(r"^.*ログイン.*$", re.IGNORECASE),
+            re.compile(r"^.*アカウント.*$", re.IGNORECASE),
+            re.compile(r"^.*会員.*登録.*$", re.IGNORECASE),
+        ]
+
+    def is_likely_booking_email(self, email: EmailMessage) -> bool:
+        """
+        Quick check if email is likely a booking email based on subject.
+        Returns True if it's likely a booking, False if clearly not.
+        """
+        subject = email.subject
+
+        # Check for obvious non-booking patterns first
+        for pattern in self.non_booking_subject_patterns:
+            if pattern.search(subject):
+                logger.debug(
+                    "Email identified as non-booking by subject",
+                    email_id=email.id,
+                    subject=subject[:100],
+                )
+                return False
+
+        # Check for booking confirmation patterns in subject
+        for pattern in self.booking_confirmation_patterns:
+            if pattern.search(subject):
+                logger.debug(
+                    "Email identified as likely booking by subject",
+                    email_id=email.id,
+                    subject=subject[:100],
+                )
+                return True
+
+        # If no clear indicators, consider it potentially a booking
+        return True
 
     def is_promotional_email(self, email: EmailMessage) -> bool:
         """
@@ -199,3 +266,13 @@ def is_promotional_email(email: EmailMessage) -> bool:
     """
     email_filter = EmailFilter()
     return email_filter.is_promotional_email(email)
+
+
+def is_likely_booking_email(email: EmailMessage) -> bool:
+    """
+    Convenience function to check if an email is likely a booking email.
+
+    Returns True if the email is likely a booking, False if clearly not.
+    """
+    email_filter = EmailFilter()
+    return email_filter.is_likely_booking_email(email)

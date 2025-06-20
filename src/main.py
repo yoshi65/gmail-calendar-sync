@@ -130,10 +130,24 @@ def process_emails(
                 # Note: calendar event creation is now handled within the processor
 
             elif not result.success:
-                # Check if it was a promotional email skip
+                # Check if it was a promotional email skip or no flight info found
                 if result.error_message == "Skipped promotional email":
                     logger.info(
                         "Skipped promotional email",
+                        email_id=email.id,
+                        subject=email.subject[:100],
+                    )
+                elif result.error_message == "No flight information found in email":
+                    logger.info(
+                        "No flight information found in email",
+                        email_id=email.id,
+                        subject=email.subject[:100],
+                    )
+                elif (
+                    result.error_message == "No car sharing information found in email"
+                ):
+                    logger.info(
+                        "No car sharing information found in email",
                         email_id=email.id,
                         subject=email.subject[:100],
                     )
@@ -188,11 +202,31 @@ def send_slack_notification(
             for r in results
             if not r.success and r.error_message == "Skipped promotional email"
         )
-        failed = len(results) - successful - promotional_skipped
+        no_flight_info = sum(
+            1
+            for r in results
+            if not r.success
+            and r.error_message == "No flight information found in email"
+        )
+        no_carshare_info = sum(
+            1
+            for r in results
+            if not r.success
+            and r.error_message == "No car sharing information found in email"
+        )
+        failed = (
+            len(results)
+            - successful
+            - promotional_skipped
+            - no_flight_info
+            - no_carshare_info
+        )
 
         message = "📧 Gmail Calendar Sync Summary\n"
         message += f"✅ Processed: {successful}\n"
         message += f"🚫 Promotional skipped: {promotional_skipped}\n"
+        message += f"ℹ️ No flight info: {no_flight_info}\n"
+        message += f"ℹ️ No carshare info: {no_carshare_info}\n"
         message += f"❌ Failed: {failed}\n"
         message += f"📊 Total emails: {len(results)}"
 
@@ -202,6 +236,9 @@ def send_slack_notification(
                 if (
                     not result.success
                     and result.error_message != "Skipped promotional email"
+                    and result.error_message != "No flight information found in email"
+                    and result.error_message
+                    != "No car sharing information found in email"
                 ):
                     message += f"• {result.email_id}: {result.error_message}\n"
 
@@ -247,13 +284,33 @@ def main() -> None:
             for r in results
             if not r.success and r.error_message == "Skipped promotional email"
         )
-        failed = len(results) - successful - promotional_skipped
+        no_flight_info = sum(
+            1
+            for r in results
+            if not r.success
+            and r.error_message == "No flight information found in email"
+        )
+        no_carshare_info = sum(
+            1
+            for r in results
+            if not r.success
+            and r.error_message == "No car sharing information found in email"
+        )
+        failed = (
+            len(results)
+            - successful
+            - promotional_skipped
+            - no_flight_info
+            - no_carshare_info
+        )
 
         logger.info(
             "Gmail Calendar Sync completed",
             total=len(results),
             successful=successful,
             promotional_skipped=promotional_skipped,
+            no_flight_info=no_flight_info,
+            no_carshare_info=no_carshare_info,
             failed=failed,
         )
 
