@@ -34,55 +34,7 @@ jobs:
 
     - name: Run performance tests
       run: |
-        # Create performance test file
-        cat > tests/test_performance.py << 'EOF'
-        import pytest
-        from src.utils.email_filter import EmailFilter, is_promotional_email, is_likely_booking_email
-        from src.models.email_types import EmailMessage
-
-        @pytest.fixture
-        def sample_emails():
-            return [
-                EmailMessage(id="1", subject="ANA予約確認", body="予約内容...", domain="ana.co.jp"),
-                EmailMessage(id="2", subject="キャンペーンのお知らせ", body="キャンペーン内容...", domain="ana.co.jp"),
-                EmailMessage(id="3", subject="JAL eチケット", body="チケット内容...", domain="booking.jal.com"),
-                EmailMessage(id="4", subject="タイムズカー利用開始", body="利用内容...", domain="share.timescar.jp"),
-                EmailMessage(id="5", subject="プレゼントキャンペーン", body="プレゼント内容...", domain="carshares.jp"),
-            ] * 20  # 100 emails total
-
-        def test_email_filter_performance(benchmark, sample_emails):
-            """Test email filtering performance."""
-            email_filter = EmailFilter()
-
-            def filter_emails():
-                results = []
-                for email in sample_emails:
-                    is_promo = email_filter.is_promotional_email(email)
-                    is_booking = email_filter.is_likely_booking_email(email)
-                    results.append((is_promo, is_booking))
-                return results
-
-            result = benchmark(filter_emails)
-            assert len(result) == len(sample_emails)
-
-        def test_promotional_filter_performance(benchmark, sample_emails):
-            """Test promotional filtering performance."""
-            def filter_promotional():
-                return [is_promotional_email(email) for email in sample_emails]
-
-            result = benchmark(filter_promotional)
-            assert len(result) == len(sample_emails)
-
-        def test_booking_detection_performance(benchmark, sample_emails):
-            """Test booking detection performance."""
-            def detect_bookings():
-                return [is_likely_booking_email(email) for email in sample_emails]
-
-            result = benchmark(detect_bookings)
-            assert len(result) == len(sample_emails)
-        EOF
-
-        # Run performance tests
+        # Run performance tests using existing test file
         uv run pytest tests/test_performance.py -v --benchmark-only --benchmark-sort=mean
 
     - name: Performance regression check
