@@ -116,24 +116,31 @@ class EmailFilter:
 
         # Non-booking subject patterns (obvious non-booking emails)
         self.non_booking_subject_patterns: list[Pattern[str]] = [
-            # Obvious promotional/newsletter subjects
-            re.compile(r"^.*キャンペーン.*$", re.IGNORECASE),
-            re.compile(r"^.*プレゼント.*$", re.IGNORECASE),
+            # Obvious promotional/newsletter subjects (avoid specific booking-related patterns)
+            re.compile(
+                r"^.*キャンペーン(?!.*予約|.*開始|.*利用|.*確認).*$", re.IGNORECASE
+            ),
+            re.compile(
+                r"^.*プレゼント(?!.*予約|.*開始|.*利用|.*確認).*$", re.IGNORECASE
+            ),
             re.compile(r"^.*マイル.*キャンペーン.*$", re.IGNORECASE),
             re.compile(r"^.*ポイント.*キャンペーン.*$", re.IGNORECASE),
-            re.compile(r"^.*お知らせ.*$", re.IGNORECASE),
+            re.compile(
+                r"^(?!.*予約|.*開始|.*利用|.*確認|.*完了|.*変更|.*キャンセル).*お知らせ.*$",
+                re.IGNORECASE,
+            ),
             re.compile(r"^.*メルマガ.*$", re.IGNORECASE),
             re.compile(r"^.*ニュースレター.*$", re.IGNORECASE),
-            re.compile(r"^.*セール.*$", re.IGNORECASE),
-            re.compile(r"^.*割引.*$", re.IGNORECASE),
-            re.compile(r"^.*特典.*$", re.IGNORECASE),
+            re.compile(r"^.*セール(?!.*予約|.*開始|.*利用|.*確認).*$", re.IGNORECASE),
+            re.compile(r"^.*割引(?!.*予約|.*開始|.*利用|.*確認).*$", re.IGNORECASE),
+            re.compile(r"^.*特典(?!.*予約|.*開始|.*利用|.*確認).*$", re.IGNORECASE),
             # System/service notifications that are clearly not bookings
             re.compile(r"^.*メンテナンス.*$", re.IGNORECASE),
-            re.compile(r"^.*システム.*$", re.IGNORECASE),
-            re.compile(r"^.*パスワード.*$", re.IGNORECASE),
-            re.compile(r"^.*ログイン.*$", re.IGNORECASE),
-            re.compile(r"^.*アカウント.*$", re.IGNORECASE),
-            re.compile(r"^.*会員.*登録.*$", re.IGNORECASE),
+            re.compile(r"^.*システム.*障害.*$", re.IGNORECASE),
+            re.compile(r"^.*パスワード.*変更.*$", re.IGNORECASE),
+            re.compile(r"^.*ログイン.*通知.*$", re.IGNORECASE),
+            re.compile(r"^.*アカウント.*停止.*$", re.IGNORECASE),
+            re.compile(r"^.*会員.*登録.*完了.*$", re.IGNORECASE),
         ]
 
     def is_likely_booking_email(self, email: EmailMessage) -> bool:

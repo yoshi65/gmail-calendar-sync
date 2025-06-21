@@ -381,11 +381,12 @@ class TestCarShareEmailProcessor:
 
     def test_process_promotional_email_skipped(self, processor):
         """Test that promotional emails are skipped."""
+        # Use a promotional email that passes non-booking filter but gets caught by promotional filter
         promotional_email = EmailMessage(
             id="msg123",
-            subject="キャンペーン情報！お得なプラン",
+            subject="タイムズカー新サービス情報",
             sender="campaign@share.timescar.jp",
-            body="期間限定キャンペーン実施中！詳しくはこちら",
+            body="期間限定キャンペーン実施中！詳しくはこちらをクリック。マイルプレゼント特典も！キャンペーン情報配信中。",
             received_at=datetime.now(),
             thread_id="thread123",
         )
@@ -394,6 +395,22 @@ class TestCarShareEmailProcessor:
 
         assert result.success is False
         assert result.error_message == "Skipped promotional email"
+
+    def test_process_non_booking_email_filtered(self, processor):
+        """Test that non-booking emails are filtered early."""
+        non_booking_email = EmailMessage(
+            id="msg123",
+            subject="キャンペーン情報！お得なプラン",
+            sender="info@share.timescar.jp",
+            body="普通のキャンペーン情報です",
+            received_at=datetime.now(),
+            thread_id="thread123",
+        )
+
+        result = processor.process(non_booking_email)
+
+        assert result.success is False
+        assert result.error_message == "No car sharing information found in email"
 
     def test_create_calendar_events_reserved_booking(
         self, processor, sample_email, sample_carshare_booking
