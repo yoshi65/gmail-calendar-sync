@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Optional settings
     slack_webhook_url: str | None = None
-    sync_period_hours: int = 8  # Default 8 hours
+    sync_period_hours: int = 3  # Default 3 hours (optimized for 1-hour cron interval)
     sync_period_days: int = 30  # Fallback for backward compatibility
     log_level: str = "INFO"
 
