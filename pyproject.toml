@@ -1,9 +1,30 @@
 [project]
 name = "gmail-calendar-sync"
 version = "0.1.0"
-description = "Sync Gmail flight bookings to Google Calendar using AI"
+description = "🤖 AI-powered email analysis system that automatically extracts flight & car sharing bookings from Gmail and creates Google Calendar events"
 authors = [
     {name = "yoshitaka", email = "yoshi65@example.com"}
+]
+maintainers = [
+    {name = "yoshitaka", email = "yoshi65@example.com"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+keywords = ["gmail", "calendar", "ai", "automation", "openai", "google-api", "email-processing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Email",
+    "Topic :: Office/Business :: Scheduling",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -18,6 +39,13 @@ dependencies = [
     "structlog>=23.0.0",
     "httpx>=0.24.0",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/yoshi65/gmail-calendar-sync"
+"Documentation" = "https://github.com/yoshi65/gmail-calendar-sync#readme"
+"Repository" = "https://github.com/yoshi65/gmail-calendar-sync"
+"Bug Tracker" = "https://github.com/yoshi65/gmail-calendar-sync/issues"
+"Changelog" = "https://github.com/yoshi65/gmail-calendar-sync/releases"
 
 [project.optional-dependencies]
 dev = [

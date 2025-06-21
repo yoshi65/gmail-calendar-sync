@@ -182,3 +182,50 @@ token.json
 # Environment variable files
 .env.*
 !.env.example
+
+# Security scan reports
+bandit-report.json
+safety-report.json
+*.sarif
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# Cloud credentials and config
+gcloud/
+.config/gcloud/
+.gcp/
+.aws/
+.azure/
+
+# Terraform (if used for infrastructure)
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+
+# Docker secrets
+docker-compose.override.yml
+secrets/
+
+# Additional sensitive patterns
+*password*
+*api_key*
+*private_key*
+*access_token*
+*refresh_token*
+*.pem
+*.p12
+*.pfx
+
+# IDE and editor temp files
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

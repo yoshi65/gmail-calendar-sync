@@ -1,0 +1,90 @@
+name: Performance Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 4 * * 0'  # Weekly on Sunday at 4 AM JST
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.repository == 'yoshi65/gmail-calendar-sync'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python 3.12
+      run: uv python install 3.12
+
+    - name: Install dependencies
+      run: uv sync --all-extras
+
+    - name: Add performance testing tools
+      run: |
+        uv add --dev pytest-benchmark
+        uv add --dev memory-profiler
+
+    - name: Run performance tests
+      run: |
+        # Create performance test file
+        cat > tests/test_performance.py << 'EOF'
+        import pytest
+        from src.utils.email_filter import EmailFilter, is_promotional_email, is_likely_booking_email
+        from src.models.email_types import EmailMessage
+
+        @pytest.fixture
+        def sample_emails():
+            return [
+                EmailMessage(id="1", subject="ANA予約確認", body="予約内容...", domain="ana.co.jp"),
+                EmailMessage(id="2", subject="キャンペーンのお知らせ", body="キャンペーン内容...", domain="ana.co.jp"),
+                EmailMessage(id="3", subject="JAL eチケット", body="チケット内容...", domain="booking.jal.com"),
+                EmailMessage(id="4", subject="タイムズカー利用開始", body="利用内容...", domain="share.timescar.jp"),
+                EmailMessage(id="5", subject="プレゼントキャンペーン", body="プレゼント内容...", domain="carshares.jp"),
+            ] * 20  # 100 emails total
+
+        def test_email_filter_performance(benchmark, sample_emails):
+            """Test email filtering performance."""
+            email_filter = EmailFilter()
+
+            def filter_emails():
+                results = []
+                for email in sample_emails:
+                    is_promo = email_filter.is_promotional_email(email)
+                    is_booking = email_filter.is_likely_booking_email(email)
+                    results.append((is_promo, is_booking))
+                return results
+
+            result = benchmark(filter_emails)
+            assert len(result) == len(sample_emails)
+
+        def test_promotional_filter_performance(benchmark, sample_emails):
+            """Test promotional filtering performance."""
+            def filter_promotional():
+                return [is_promotional_email(email) for email in sample_emails]
+
+            result = benchmark(filter_promotional)
+            assert len(result) == len(sample_emails)
+
+        def test_booking_detection_performance(benchmark, sample_emails):
+            """Test booking detection performance."""
+            def detect_bookings():
+                return [is_likely_booking_email(email) for email in sample_emails]
+
+            result = benchmark(detect_bookings)
+            assert len(result) == len(sample_emails)
+        EOF
+
+        # Run performance tests
+        uv run pytest tests/test_performance.py -v --benchmark-only --benchmark-sort=mean
+
+    - name: Performance regression check
+      run: |
+        echo "Performance tests completed. Check the logs above for any performance regressions."
