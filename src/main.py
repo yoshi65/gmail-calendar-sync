@@ -58,6 +58,17 @@ def process_emails(
 
     if not emails:
         logger.info("No supported emails found")
+        # Log session summary even when no emails found
+        logger.info(
+            "Gmail Calendar Sync completed",
+            message="Gmail Calendar Sync completed",
+            total=0,
+            successful=0,
+            promotional_skipped=0,
+            no_flight_info=0,
+            no_carshare_info=0,
+            failed=0,
+        )
         return []
 
     logger.info("Processing emails", count=len(emails))
@@ -306,6 +317,7 @@ def main() -> None:
 
         logger.info(
             "Gmail Calendar Sync completed",
+            message="Gmail Calendar Sync completed",
             total=len(results),
             successful=successful,
             promotional_skipped=promotional_skipped,
