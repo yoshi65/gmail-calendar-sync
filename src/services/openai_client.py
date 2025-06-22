@@ -1,6 +1,7 @@
 """OpenAI API client for email content analysis."""
 
 import json
+import time
 from datetime import datetime
 from typing import Any
 
@@ -15,7 +16,9 @@ from ..models.carshare import (
     StationInfo,
 )
 from ..models.flight import Airport, FlightBooking, FlightSegment
+from ..models.openai_metrics import OpenAIMetrics
 from ..utils.config import Settings
+from ..utils.openai_metrics_collector import get_metrics_collector
 
 logger = structlog.get_logger()
 
@@ -92,6 +95,9 @@ Extract the flight booking information from this email and return it as JSON."""
                 "Extracting flight info from email", subject=email_subject[:100]
             )
 
+            # Start timing
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -100,6 +106,34 @@ Extract the flight booking information from this email and return it as JSON."""
                 ],
                 temperature=0.1,
                 max_tokens=2000,
+            )
+
+            # Calculate processing time
+            processing_time_ms = (time.time() - start_time) * 1000
+
+            # Create and collect metrics
+            metrics = OpenAIMetrics.create_from_response(
+                model="gpt-3.5-turbo",
+                email_type="flight",
+                processing_time_ms=processing_time_ms,
+                response=response,
+                success=True,
+            )
+
+            # Add to metrics collector
+            get_metrics_collector().add_metrics(metrics)
+
+            logger.info(
+                "OpenAI API call completed",
+                message="OpenAI API call completed",
+                model=metrics.model,
+                email_type=metrics.email_type,
+                processing_time_ms=metrics.processing_time_ms,
+                prompt_tokens=metrics.usage.prompt_tokens,
+                completion_tokens=metrics.usage.completion_tokens,
+                total_tokens=metrics.usage.total_tokens,
+                cost_usd=metrics.cost_usd,
+                success=metrics.success,
             )
 
             content = response.choices[0].message.content
@@ -143,7 +177,34 @@ Extract the flight booking information from this email and return it as JSON."""
             return flight_booking
 
         except Exception as e:
-            logger.error("Failed to extract flight info", error=str(e))
+            # Calculate processing time even for failed calls
+            processing_time_ms = (
+                (time.time() - start_time) * 1000 if "start_time" in locals() else 0
+            )
+
+            # Create and collect error metrics
+            error_metrics = OpenAIMetrics.create_from_response(
+                model="gpt-3.5-turbo",
+                email_type="flight",
+                processing_time_ms=processing_time_ms,
+                response=None,
+                success=False,
+                error_message=str(e),
+            )
+
+            # Add to metrics collector
+            get_metrics_collector().add_metrics(error_metrics)
+
+            logger.error(
+                "OpenAI API call failed",
+                message="OpenAI API call failed",
+                model=error_metrics.model,
+                email_type=error_metrics.email_type,
+                processing_time_ms=error_metrics.processing_time_ms,
+                cost_usd=error_metrics.cost_usd,
+                success=error_metrics.success,
+                error=str(e),
+            )
             return None
 
     def _convert_to_flight_booking(self, data: dict[str, Any]) -> FlightBooking | None:
@@ -311,6 +372,9 @@ Extract the car sharing booking information from this email and return it as JSO
                 provider=provider,
             )
 
+            # Start timing
+            start_time = time.time()
+
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -319,6 +383,34 @@ Extract the car sharing booking information from this email and return it as JSO
                 ],
                 temperature=0.1,
                 max_tokens=2000,
+            )
+
+            # Calculate processing time
+            processing_time_ms = (time.time() - start_time) * 1000
+
+            # Create and collect metrics
+            metrics = OpenAIMetrics.create_from_response(
+                model="gpt-3.5-turbo",
+                email_type="carshare",
+                processing_time_ms=processing_time_ms,
+                response=response,
+                success=True,
+            )
+
+            # Add to metrics collector
+            get_metrics_collector().add_metrics(metrics)
+
+            logger.info(
+                "OpenAI API call completed",
+                message="OpenAI API call completed",
+                model=metrics.model,
+                email_type=metrics.email_type,
+                processing_time_ms=metrics.processing_time_ms,
+                prompt_tokens=metrics.usage.prompt_tokens,
+                completion_tokens=metrics.usage.completion_tokens,
+                total_tokens=metrics.usage.total_tokens,
+                cost_usd=metrics.cost_usd,
+                success=metrics.success,
             )
 
             content = response.choices[0].message.content
@@ -365,7 +457,34 @@ Extract the car sharing booking information from this email and return it as JSO
             return carshare_booking
 
         except Exception as e:
-            logger.error("Failed to extract car sharing info", error=str(e))
+            # Calculate processing time even for failed calls
+            processing_time_ms = (
+                (time.time() - start_time) * 1000 if "start_time" in locals() else 0
+            )
+
+            # Create and collect error metrics
+            error_metrics = OpenAIMetrics.create_from_response(
+                model="gpt-3.5-turbo",
+                email_type="carshare",
+                processing_time_ms=processing_time_ms,
+                response=None,
+                success=False,
+                error_message=str(e),
+            )
+
+            # Add to metrics collector
+            get_metrics_collector().add_metrics(error_metrics)
+
+            logger.error(
+                "OpenAI API call failed",
+                message="OpenAI API call failed",
+                model=error_metrics.model,
+                email_type=error_metrics.email_type,
+                processing_time_ms=error_metrics.processing_time_ms,
+                cost_usd=error_metrics.cost_usd,
+                success=error_metrics.success,
+                error=str(e),
+            )
             return None
 
     def _convert_to_carshare_booking(

@@ -19,6 +19,7 @@ OpenAI APIを使用してメール内容を自動解析し、Cloud Run Jobsで�
 - **🔧 拡張可能**: プロセッサーパターンで新しいメール種別に簡単対応
 - **⚡ 時間ベース競合解決**: カーシェアの時間重複を自動検出・解決
 - **🎯 スマートフィルタリング**: 件名ベース事前判定でOpenAI API呼出し最小化 ✨ NEW!
+- **📊 運用監視**: BigQuery + Looker Studio による包括的な監視ダッシュボード ✨ NEW!
 
 ## ✈️🚗 サポート対象
 
@@ -41,13 +42,22 @@ OpenAI APIを使用してメール内容を自動解析し、Cloud Run Jobsで�
 - Google Cloud Platform アカウント
 - OpenAI API アカウント
 
-## 🆕 NEW: 時間単位 & 日付範囲指定機能
+## 🆕 NEW: 1時間間隔実行 & 包括的監視システム
 
-頻繁実行に最適化された時間単位指定と、初回実行用の日付範囲指定機能を追加！
+### ⏰ 高頻度実行の最適化
+- **実行間隔**: 6時間 → 1時間（6倍のリアルタイム性）
+- **処理範囲**: 30日 → 3時間（重複処理で安全性確保）
+- **OpenAI API**: 40-60%コスト削減（スマートフィルタリング）
+
+### 📊 運用監視システム
+- **Cloud Logging**: 構造化ログ出力
+- **BigQuery**: 自動データ蓄積・分析
+- **Looker Studio**: リアルタイム監視ダッシュボード
+- **Slack通知**: アラート・レポート自動送信
 
 ```bash
-# ⏰ 時間単位指定（推奨）
-SYNC_PERIOD_HOURS=8 uv run python src/main.py
+# ⏰ 最適化された設定（推奨）
+SYNC_PERIOD_HOURS=3 uv run python src/main.py
 
 # 📅 日付範囲指定
 SYNC_START_DATE=2024-01-01 SYNC_END_DATE=2024-01-31 uv run python src/main.py
@@ -696,6 +706,7 @@ git commit  # 自動的にruff・mypy実行
 - **テスト**: 新機能には必ずテストを追加
 - **セキュリティ**: [SECURITY.md](SECURITY.md) を参照
 - **ドキュメント**: README・CLAUDE.mdを更新
+- **教訓記録**: [CLAUDE.md](CLAUDE.md) の「開発・運用で得られた重要な教訓」を参照
 
 ## 📄 ライセンス
 

@@ -11,6 +11,7 @@ from .services.gmail_client import GmailClient
 from .utils.config import Settings, get_settings
 from .utils.exceptions import GmailCalendarSyncError
 from .utils.logging import configure_logging
+from .utils.openai_metrics_collector import get_metrics_collector
 
 
 def setup_logging() -> None:
@@ -325,6 +326,9 @@ def main() -> None:
             no_carshare_info=no_carshare_info,
             failed=failed,
         )
+
+        # Log OpenAI API usage summary
+        get_metrics_collector().log_summary()
 
         if failed > 0:
             logger.warning("Some emails failed to process", failed_count=failed)
