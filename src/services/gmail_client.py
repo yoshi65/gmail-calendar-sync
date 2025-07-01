@@ -26,9 +26,11 @@ class GmailClient:
     def _get_service(self) -> Any:
         """Get Gmail API service."""
         if self._service is None:
-            client_id, client_secret, refresh_token = (
-                self.settings.get_gmail_credentials()
-            )
+            (
+                client_id,
+                client_secret,
+                refresh_token,
+            ) = self.settings.get_gmail_credentials()
 
             credentials = Credentials(
                 token=None,

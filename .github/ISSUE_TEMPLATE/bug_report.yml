@@ -66,10 +66,10 @@ body:
       label: Environment
       description: Please provide environment details
       value: |
-        - OS: 
-        - Python version: 
-        - uv version: 
-        - Installation method: 
+        - OS:
+        - Python version:
+        - uv version:
+        - Installation method:
       render: markdown
     validations:
       required: true

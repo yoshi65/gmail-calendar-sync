@@ -25,7 +25,7 @@ Brief description of the changes in this PR.
 ## Testing
 
 - [ ] Unit tests pass locally
-- [ ] Integration tests pass locally  
+- [ ] Integration tests pass locally
 - [ ] New tests added for new functionality
 - [ ] Manual testing completed
 
@@ -41,7 +41,7 @@ uv run ruff check src/
 ## Email Type Support (if applicable)
 
 - [ ] Flight bookings (ANA)
-- [ ] Flight bookings (JAL)  
+- [ ] Flight bookings (JAL)
 - [ ] Car sharing (Times Car)
 - [ ] Car sharing (Mitsui)
 - [ ] New email type: ________________

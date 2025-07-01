@@ -25,9 +25,11 @@ class CalendarClient:
     def _get_service(self) -> Any:
         """Get Google Calendar API service."""
         if self._service is None:
-            client_id, client_secret, refresh_token = (
-                self.settings.get_calendar_credentials()
-            )
+            (
+                client_id,
+                client_secret,
+                refresh_token,
+            ) = self.settings.get_calendar_credentials()
 
             credentials = Credentials(
                 token=None,
