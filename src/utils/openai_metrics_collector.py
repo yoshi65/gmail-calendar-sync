@@ -69,9 +69,9 @@ class OpenAIMetricsCollector:
             by_email_type[email_type]["calls"] += 1
             by_email_type[email_type]["cost_usd"] += metrics.cost_usd
             by_email_type[email_type]["tokens"] += metrics.usage.total_tokens
-            by_email_type[email_type][
-                "processing_time_ms"
-            ] += metrics.processing_time_ms
+            by_email_type[email_type]["processing_time_ms"] += (
+                metrics.processing_time_ms
+            )
 
             if metrics.success:
                 by_email_type[email_type]["successful"] += 1
