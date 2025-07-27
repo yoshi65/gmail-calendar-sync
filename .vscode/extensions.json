@@ -1,0 +1,32 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "ms-python.pylint",
+    "ms-vscode.test-adapter-converter",
+    "hbenl.vscode-test-explorer",
+    "streetsidesoftware.code-spell-checker",
+    "editorconfig.editorconfig",
+    "github.vscode-github-actions",
+    "github.copilot",
+    "eamodio.gitlens",
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+    "foxundermoon.shell-format",
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+    "gruntfuggly.todo-tree",
+    "alefragnani.bookmarks",
+    "aaron-bond.better-comments",
+    "mikestead.dotenv",
+    "shd101wyy.markdown-preview-enhanced",
+    "bierner.markdown-mermaid"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.autopep8",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.flake8"
+  ]
+}

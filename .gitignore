@@ -138,8 +138,8 @@ cython_debug/
 # PyCharm
 .idea/
 
-# VS Code
-.vscode/
+# VS Code (allow development configuration)
+# .vscode/
 
 # macOS
 .DS_Store
@@ -182,6 +182,7 @@ token.json
 # Environment variable files
 .env.*
 !.env.example
+!.env.debug.example
 
 # Security scan reports
 bandit-report.json
