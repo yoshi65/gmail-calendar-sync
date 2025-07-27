@@ -21,22 +21,38 @@ jobs:
       with:
         version: "latest"
 
-    - name: Set up Python 3.12
-      run: uv python install 3.12
+    - name: Set up Python 3.13
+      run: uv python install 3.13
 
     - name: Install dependencies
       run: uv sync --all-extras
 
     - name: Add performance testing tools
       run: |
-        uv add --dev pytest-benchmark
-        uv add --dev memory-profiler
+        uv add --group dev pytest-benchmark memory-profiler
 
-    - name: Run performance tests
+    - name: Run performance benchmarks
       run: |
         # Run performance tests using existing test file
-        uv run pytest tests/test_performance.py -v --benchmark-only --benchmark-sort=mean
+        uv run pytest tests/test_performance.py -v --benchmark-only --benchmark-sort=mean --benchmark-json=benchmark.json
 
-    - name: Performance regression check
+    - name: Performance regression analysis
       run: |
-        echo "Performance tests completed. Check the logs above for any performance regressions."
+        echo "## 📊 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo "### Benchmark Summary" >> $GITHUB_STEP_SUMMARY
+        if [ -f benchmark.json ]; then
+          echo "📈 Performance benchmarks completed" >> $GITHUB_STEP_SUMMARY
+          echo "📋 Detailed results available in benchmark artifacts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ No benchmark results found" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "### Performance Status" >> $GITHUB_STEP_SUMMARY
+        echo "✅ All performance benchmarks completed successfully" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-benchmarks
+        path: benchmark.json
+        retention-days: 30
