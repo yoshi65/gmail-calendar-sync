@@ -30,8 +30,69 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v2'
 
       - name: Deploy using Cloud Build
+        id: deploy
         run: |
           SERVICE_ACCOUNT_EMAIL=$(echo "$GCP_SA_KEY" | jq -r '.client_email')
           gcloud builds submit --config cloudbuild.yaml --substitutions SHORT_SHA=${GITHUB_SHA:0:7},_SERVICE_ACCOUNT_EMAIL=$SERVICE_ACCOUNT_EMAIL .
+          echo "deployment_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Verify deployment health
+        run: |
+          echo "## 🚀 Deployment Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "- 📅 Deployed at: ${{ steps.deploy.outputs.deployment_time }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 Commit SHA: ${GITHUB_SHA:0:7}" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌿 Branch: ${GITHUB_REF_NAME}" >> $GITHUB_STEP_SUMMARY
+
+          # Check if the Cloud Run job exists and is ready
+          JOB_NAME="gmail-calendar-sync"
+          REGION="asia-northeast1"
+
+          echo "### Service Health" >> $GITHUB_STEP_SUMMARY
+          if gcloud run jobs describe $JOB_NAME --region=$REGION --quiet > /dev/null 2>&1; then
+            echo "- ✅ Cloud Run job exists and is accessible" >> $GITHUB_STEP_SUMMARY
+
+            # Get job details
+            LATEST_IMAGE=$(gcloud run jobs describe $JOB_NAME --region=$REGION --format="value(spec.template.spec.template.spec.containers[0].image)" 2>/dev/null || echo "N/A")
+            echo "- 🖼️  Latest image: $LATEST_IMAGE" >> $GITHUB_STEP_SUMMARY
+
+            # Check if image contains our commit SHA
+            if echo "$LATEST_IMAGE" | grep -q "${GITHUB_SHA:0:7}"; then
+              echo "- ✅ Deployment contains expected commit SHA" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ⚠️  Deployment may not contain expected commit SHA" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ❌ Cloud Run job not found or not accessible" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Send deployment notification
+        if: always()
+        run: |
+          SLACK_WEBHOOK="${{ secrets.SLACK_WEBHOOK_URL }}"
+          if [ -n "$SLACK_WEBHOOK" ]; then
+            DEPLOYMENT_STATUS="${{ job.status }}"
+            EMOJI="🚀"
+            if [ "$DEPLOYMENT_STATUS" != "success" ]; then
+              EMOJI="❌"
+            fi
+
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{
+                \"text\": \"$EMOJI *Gmail Calendar Sync Deployment*\",
+                \"attachments\": [{
+                  \"color\": \"$([ '$DEPLOYMENT_STATUS' = 'success' ] && echo 'good' || echo 'danger')\",
+                  \"fields\": [
+                    {\"title\": \"Status\", \"value\": \"$DEPLOYMENT_STATUS\", \"short\": true},
+                    {\"title\": \"Commit\", \"value\": \"${GITHUB_SHA:0:7}\", \"short\": true},
+                    {\"title\": \"Branch\", \"value\": \"${GITHUB_REF_NAME}\", \"short\": true},
+                    {\"title\": \"Deployed at\", \"value\": \"${{ steps.deploy.outputs.deployment_time }}\", \"short\": true}
+                  ]
+                }]
+              }" \
+              $SLACK_WEBHOOK || echo "Failed to send Slack notification"
+          else
+            echo "Slack webhook not configured, skipping notification"
+          fi
