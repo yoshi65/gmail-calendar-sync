@@ -49,6 +49,10 @@ class TestProcessEmails:
 
         mock_email = Mock()
         mock_email.id = "email123"
+        mock_email.subject = "Flight confirmation - AA123"
+        mock_email.sender = "noreply@airline.com"
+        mock_email.body = "Your flight booking details..."
+        mock_email.domain = "airline.com"
         mock_email.type = EmailType.FLIGHT
         self.gmail_client.get_all_supported_emails.return_value = [mock_email]
 
@@ -60,7 +64,7 @@ class TestProcessEmails:
             extracted_data={"flight": "data"},
             calendar_event_id="event123",
         )
-        self.processor_factory.create_processor.return_value = mock_processor
+        self.processor_factory.get_processor.return_value = mock_processor
 
         # Execute
         results = process_emails(
@@ -74,9 +78,7 @@ class TestProcessEmails:
         self.gmail_client.get_all_supported_emails.assert_called_once_with(
             start_date=start_date, end_date=end_date
         )
-        self.processor_factory.create_processor.assert_called_once_with(
-            EmailType.FLIGHT, self.calendar_client
-        )
+        self.processor_factory.get_processor.assert_called_once_with(mock_email)
         mock_processor.process.assert_called_once_with(mock_email)
         assert len(results) == 1
         assert results[0].success
@@ -88,6 +90,10 @@ class TestProcessEmails:
 
         mock_email = Mock()
         mock_email.id = "email456"
+        mock_email.subject = "Car reservation confirmed"
+        mock_email.sender = "noreply@carshare.com"
+        mock_email.body = "Your car share booking..."
+        mock_email.domain = "carshare.com"
         mock_email.type = EmailType.CAR_SHARE
         self.gmail_client.get_all_supported_emails.return_value = [mock_email]
 
@@ -99,7 +105,7 @@ class TestProcessEmails:
             extracted_data={"carshare": "data"},
             calendar_event_id="event456",
         )
-        self.processor_factory.create_processor.return_value = mock_processor
+        self.processor_factory.get_processor.return_value = mock_processor
 
         # Execute
         results = process_emails(
@@ -123,6 +129,10 @@ class TestProcessEmails:
 
         mock_email = Mock()
         mock_email.id = "email789"
+        mock_email.subject = "Flight booking details"
+        mock_email.sender = "booking@airline.com"
+        mock_email.body = "Flight booking information..."
+        mock_email.domain = "airline.com"
         mock_email.type = EmailType.FLIGHT
         self.gmail_client.get_all_supported_emails.return_value = [mock_email]
 
@@ -133,7 +143,7 @@ class TestProcessEmails:
             success=False,
             error_message="Already processed",
         )
-        self.processor_factory.create_processor.return_value = mock_processor
+        self.processor_factory.get_processor.return_value = mock_processor
 
         # Execute
         results = process_emails(
@@ -155,10 +165,18 @@ class TestProcessEmails:
         # Setup
         flight_email = Mock()
         flight_email.id = "flight123"
+        flight_email.subject = "Flight confirmation"
+        flight_email.sender = "confirm@airline.com"
+        flight_email.body = "Flight confirmed..."
+        flight_email.domain = "airline.com"
         flight_email.type = EmailType.FLIGHT
 
         carshare_email = Mock()
         carshare_email.id = "carshare456"
+        carshare_email.subject = "Car share booking"
+        carshare_email.sender = "booking@carshare.com"
+        carshare_email.body = "Car booking confirmed..."
+        carshare_email.domain = "carshare.com"
         carshare_email.type = EmailType.CAR_SHARE
 
         self.gmail_client.get_all_supported_emails.return_value = [
@@ -185,13 +203,14 @@ class TestProcessEmails:
             calendar_event_id="carshare_event",
         )
 
-        def mock_create_processor(email_type, client):
-            if email_type == EmailType.FLIGHT:
+        def mock_get_processor(email):
+            if email.type == EmailType.FLIGHT:
                 return flight_processor
-            elif email_type == EmailType.CAR_SHARE:
+            elif email.type == EmailType.CAR_SHARE:
                 return carshare_processor
+            return None
 
-        self.processor_factory.create_processor.side_effect = mock_create_processor
+        self.processor_factory.get_processor.side_effect = mock_get_processor
 
         # Execute
         results = process_emails(
@@ -203,7 +222,7 @@ class TestProcessEmails:
 
         # Assert
         assert len(results) == 2
-        assert self.processor_factory.create_processor.call_count == 2
+        assert self.processor_factory.get_processor.call_count == 2
         assert all(r.success for r in results)
 
     def test_process_emails_handles_processing_error(self):
@@ -211,6 +230,10 @@ class TestProcessEmails:
         # Setup
         mock_email = Mock()
         mock_email.id = "error_email"
+        mock_email.subject = "Flight booking error test"
+        mock_email.sender = "test@airline.com"
+        mock_email.body = "Error test email..."
+        mock_email.domain = "airline.com"
         mock_email.type = EmailType.FLIGHT
         self.gmail_client.get_all_supported_emails.return_value = [mock_email]
 
@@ -221,7 +244,7 @@ class TestProcessEmails:
             success=False,
             error_message="Processing failed: OpenAI API error",
         )
-        self.processor_factory.create_processor.return_value = mock_processor
+        self.processor_factory.get_processor.return_value = mock_processor
 
         # Execute
         results = process_emails(
@@ -252,7 +275,7 @@ class TestProcessEmails:
 
         # Assert
         assert len(results) == 0
-        self.processor_factory.create_processor.assert_not_called()
+        self.processor_factory.get_processor.assert_not_called()
 
 
 class TestMain:
