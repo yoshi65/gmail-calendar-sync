@@ -41,18 +41,10 @@ jobs:
         echo "## 📊 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
         echo "### Benchmark Summary" >> $GITHUB_STEP_SUMMARY
         if [ -f benchmark.json ]; then
-          python3 -c "
-          import json
-          with open('benchmark.json') as f:
-              data = json.load(f)
-          benchmarks = data.get('benchmarks', [])
-          for bench in benchmarks:
-              name = bench['name']
-              mean = bench['stats']['mean']
-              stddev = bench['stats']['stddev']
-              ops = bench['stats']['ops']
-              print(f'- **{name}**: {mean:.4f}s ± {stddev:.4f}s ({ops:.1f} ops/sec)')
-          " >> $GITHUB_STEP_SUMMARY
+          echo "📈 Performance benchmarks completed" >> $GITHUB_STEP_SUMMARY
+          echo "📋 Detailed results available in benchmark artifacts" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ No benchmark results found" >> $GITHUB_STEP_SUMMARY
         fi
         echo "### Performance Status" >> $GITHUB_STEP_SUMMARY
         echo "✅ All performance benchmarks completed successfully" >> $GITHUB_STEP_SUMMARY
