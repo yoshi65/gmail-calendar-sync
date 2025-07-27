@@ -144,9 +144,23 @@ skip_empty = true
 [tool.coverage.html]
 directory = "htmlcov"
 
+[tool.bandit]
+exclude_dirs = ["tests", "build", "dist", ".venv"]
+skips = [
+    "B101",  # assert_used - Type checking assertions are acceptable
+    "B106",  # hardcoded_password_funcarg - False positive for Google OAuth2 URLs
+    "B110",  # try_except_pass - Acceptable for optional error handling
+]
+targets = ["src"]
+
+[tool.bandit.assert_used]
+skips = ["*_test.py", "test_*.py"]
+
 [dependency-groups]
 dev = [
+    "bandit[toml]>=1.8.6",
     "pre-commit==4.2.0",
     "pytest==8.4.1",
     "pytest-benchmark==5.1.0",
+    "safety>=3.2.9",
 ]
