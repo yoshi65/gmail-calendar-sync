@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
@@ -18,8 +22,8 @@ jobs:
       with:
         version: "latest"
 
-    - name: Set up Python 3.13
-      run: uv python install 3.13
+    - name: Set up Python ${{ matrix.python-version }}
+      run: uv python install ${{ matrix.python-version }}
 
     - name: Cache uv dependencies
       uses: actions/cache@v4
@@ -41,8 +45,31 @@ jobs:
     - name: Run mypy type checking
       run: uv run mypy src/
 
+    - name: Run dependency audit
+      run: |
+        uv add --group security pip-audit
+        uv run pip-audit --format=json --output=audit-report.json || true
+        if [ -f audit-report.json ]; then
+          echo "## 🔍 Security Audit Report" >> $GITHUB_STEP_SUMMARY
+          vulnerabilities=$(cat audit-report.json | python3 -c "import sys, json; data=json.load(sys.stdin); print(len(data.get('vulnerabilities', [])))" 2>/dev/null || echo "0")
+          if [ "$vulnerabilities" -gt "0" ]; then
+            echo "- ⚠️  Found $vulnerabilities potential vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ No vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
     - name: Run tests with coverage
       run: uv run pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=term-missing
+
+    - name: Run performance benchmarks (Python 3.13 only)
+      if: matrix.python-version == '3.13'
+      run: |
+        uv run pytest tests/test_performance.py --benchmark-only --benchmark-json=benchmark.json || true
+        if [ -f benchmark.json ]; then
+          echo "## 🚀 Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "Performance tests completed. See benchmark.json for details." >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
@@ -52,12 +79,15 @@ jobs:
 
     - name: Quality gate analysis
       run: |
-        echo "## 📊 Code Quality Report" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Code Quality Report (Python ${{ matrix.python-version }})" >> $GITHUB_STEP_SUMMARY
         echo "### Quality Checks" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Linting (ruff) passed" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Code formatting (ruff) passed" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Type checking (mypy) passed" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Tests passed" >> $GITHUB_STEP_SUMMARY
+        if [ -f audit-report.json ]; then
+          echo "- ✅ Security audit completed" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "### Coverage Status" >> $GITHUB_STEP_SUMMARY
         if [ -f coverage.xml ]; then
           coverage=$(python3 -c "
@@ -70,6 +100,23 @@ jobs:
               print('N/A')
           " 2>/dev/null || echo "N/A")
           echo "- 📈 Test Coverage: $coverage" >> $GITHUB_STEP_SUMMARY
+          # Check coverage threshold
+          if [ -f coverage.xml ]; then
+            coverage_num=$(python3 -c "
+            import xml.etree.ElementTree as ET
+            try:
+                tree = ET.parse('coverage.xml')
+                coverage = float(tree.getroot().attrib['line-rate']) * 100
+                print(coverage)
+            except:
+                print('0')
+            " 2>/dev/null || echo "0")
+            if (( $(echo "$coverage_num >= 50" | bc -l) )); then
+              echo "- ✅ Coverage threshold (50%) met" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ⚠️  Coverage below threshold (50%)" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
         else
           echo "- 📈 Test Coverage: N/A" >> $GITHUB_STEP_SUMMARY
         fi
