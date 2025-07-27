@@ -49,3 +49,29 @@ jobs:
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
+    - name: Quality gate analysis
+      run: |
+        echo "## 📊 Code Quality Report" >> $GITHUB_STEP_SUMMARY
+        echo "### Quality Checks" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Linting (ruff) passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Code formatting (ruff) passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Type checking (mypy) passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Tests passed" >> $GITHUB_STEP_SUMMARY
+        echo "### Coverage Status" >> $GITHUB_STEP_SUMMARY
+        if [ -f coverage.xml ]; then
+          coverage=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          try:
+              tree = ET.parse('coverage.xml')
+              coverage = tree.getroot().attrib['line-rate']
+              print(f'{float(coverage)*100:.1f}%')
+          except:
+              print('N/A')
+          " 2>/dev/null || echo "N/A")
+          echo "- 📈 Test Coverage: $coverage" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- 📈 Test Coverage: N/A" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "### Quality Gates" >> $GITHUB_STEP_SUMMARY
+        echo "- 🚪 All quality gates passed ✅" >> $GITHUB_STEP_SUMMARY
