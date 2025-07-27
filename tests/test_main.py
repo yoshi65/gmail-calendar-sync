@@ -281,6 +281,7 @@ class TestProcessEmails:
 class TestMain:
     """Test main function."""
 
+    @patch("src.main.send_slack_notification")
     @patch("src.main.get_metrics_collector")
     @patch("src.main.setup_logging")
     @patch("src.main.process_emails")
@@ -297,10 +298,12 @@ class TestMain:
         mock_process_emails,
         mock_setup_logging,
         mock_get_metrics,
+        mock_send_slack,
     ):
         """Test successful main execution."""
         # Setup
         mock_settings = Mock()
+        mock_settings.slack_webhook_url = "https://hooks.slack.com/test"
         mock_get_settings.return_value = mock_settings
 
         mock_gmail_client = Mock()
@@ -315,7 +318,7 @@ class TestMain:
         mock_metrics_collector = Mock()
         mock_get_metrics.return_value = mock_metrics_collector
 
-        # Mock successful results
+        # Mock successful results - all succeed to avoid exit(1)
         mock_results = [
             ProcessingResult(
                 email_id="test123",
@@ -327,8 +330,9 @@ class TestMain:
             ProcessingResult(
                 email_id="test456",
                 email_type=EmailType.CAR_SHARE,
-                success=False,
-                error_message="Skipped",
+                success=True,
+                extracted_data={"carshare": "data"},
+                calendar_event_id="event456",
             ),
         ]
         mock_process_emails.return_value = mock_results
@@ -344,7 +348,9 @@ class TestMain:
         mock_calendar_client_class.assert_called_once_with(mock_settings)
         mock_processor_factory_class.assert_called_once()
         mock_process_emails.assert_called_once()
-        mock_exit.assert_called_once_with(0)
+        mock_send_slack.assert_called_once_with(mock_results, mock_settings)
+        # Main function doesn't call sys.exit when successful - it exits normally
+        mock_exit.assert_not_called()
 
     @patch("src.main.setup_logging")
     @patch("src.main.get_settings")
@@ -353,12 +359,16 @@ class TestMain:
         # Setup
         mock_setup_logging.side_effect = Exception("Config error")
 
-        # Execute
+        # Execute - exception should propagate since setup_logging is outside try-catch
         with patch("sys.exit") as mock_exit:
-            main()
+            try:
+                main()
+            except Exception as e:
+                # Exception should propagate, not be caught by main
+                assert str(e) == "Config error"
 
-        # Assert
-        mock_exit.assert_called_once_with(1)
+        # Assert - sys.exit should not be called since exception propagates
+        mock_exit.assert_not_called()
 
     @patch("src.main.get_metrics_collector")
     @patch("src.main.setup_logging")
@@ -430,6 +440,7 @@ class TestMain:
         # Assert
         mock_exit.assert_called_once_with(1)
 
+    @patch("src.main.send_slack_notification")
     @patch("src.main.get_metrics_collector")
     @patch("src.main.setup_logging")
     @patch("src.main.process_emails")
@@ -446,10 +457,12 @@ class TestMain:
         mock_process_emails,
         mock_setup_logging,
         mock_get_metrics,
+        mock_send_slack,
     ):
         """Test main execution with different result types."""
         # Setup
         mock_settings = Mock()
+        mock_settings.slack_webhook_url = "https://hooks.slack.com/test"
         mock_get_settings.return_value = mock_settings
 
         mock_gmail_client = Mock()
@@ -464,7 +477,7 @@ class TestMain:
         mock_metrics_collector = Mock()
         mock_get_metrics.return_value = mock_metrics_collector
 
-        # Mock mixed results
+        # Mock mixed results - but use expected error messages to avoid counting as "failed"
         mock_results = [
             ProcessingResult(
                 email_id="success1",
@@ -484,13 +497,13 @@ class TestMain:
                 email_id="skipped1",
                 email_type=EmailType.FLIGHT,
                 success=False,
-                error_message="Already exists",
+                error_message="Skipped promotional email",
             ),
             ProcessingResult(
-                email_id="error1",
+                email_id="no_info1",
                 email_type=EmailType.CAR_SHARE,
                 success=False,
-                error_message="Failed to parse: Invalid date format",
+                error_message="No flight information found in email",
             ),
         ]
         mock_process_emails.return_value = mock_results
@@ -499,8 +512,72 @@ class TestMain:
         with patch("sys.exit") as mock_exit:
             main()
 
-        # Assert - should exit with 0 (success) even if some emails failed
-        mock_exit.assert_called_once_with(0)
+        # Assert - should not call sys.exit since all "failures" are expected categories
+        mock_send_slack.assert_called_once_with(mock_results, mock_settings)
+        mock_exit.assert_not_called()
+
+    @patch("src.main.send_slack_notification")
+    @patch("src.main.get_metrics_collector")
+    @patch("src.main.setup_logging")
+    @patch("src.main.process_emails")
+    @patch("src.main.EmailProcessorFactory")
+    @patch("src.main.CalendarClient")
+    @patch("src.main.GmailClient")
+    @patch("src.main.get_settings")
+    def test_main_with_actual_failures(
+        self,
+        mock_get_settings,
+        mock_gmail_client_class,
+        mock_calendar_client_class,
+        mock_processor_factory_class,
+        mock_process_emails,
+        mock_setup_logging,
+        mock_get_metrics,
+        mock_send_slack,
+    ):
+        """Test main execution with actual processing failures (should exit 1)."""
+        # Setup
+        mock_settings = Mock()
+        mock_settings.slack_webhook_url = "https://hooks.slack.com/test"
+        mock_get_settings.return_value = mock_settings
+
+        mock_gmail_client = Mock()
+        mock_gmail_client_class.return_value = mock_gmail_client
+
+        mock_calendar_client = Mock()
+        mock_calendar_client_class.return_value = mock_calendar_client
+
+        mock_processor_factory = Mock()
+        mock_processor_factory_class.return_value = mock_processor_factory
+
+        mock_metrics_collector = Mock()
+        mock_get_metrics.return_value = mock_metrics_collector
+
+        # Mock results with actual processing failures
+        mock_results = [
+            ProcessingResult(
+                email_id="success1",
+                email_type=EmailType.FLIGHT,
+                success=True,
+                extracted_data={"flight": "data"},
+                calendar_event_id="event1",
+            ),
+            ProcessingResult(
+                email_id="failed1",
+                email_type=EmailType.CAR_SHARE,
+                success=False,
+                error_message="OpenAI API error: Rate limit exceeded",
+            ),
+        ]
+        mock_process_emails.return_value = mock_results
+
+        # Execute
+        with patch("sys.exit") as mock_exit:
+            main()
+
+        # Assert - should exit with 1 due to actual processing failure
+        mock_send_slack.assert_called_once_with(mock_results, mock_settings)
+        mock_exit.assert_called_once_with(1)
 
     @patch("src.main.get_metrics_collector")
     def test_main_metrics_collection_error(self, mock_get_metrics):
