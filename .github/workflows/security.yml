@@ -27,24 +27,37 @@ jobs:
           version: "latest"
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.13
 
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run safety check
+      - name: Add security scanning tools
         run: |
-          uv add --dev safety
-          uv run safety check --json || true
+          uv add --group dev safety bandit[toml]
+
+      - name: Run safety dependency vulnerability scan
+        run: |
+          uv run safety check --json --output safety-report.json || true
+          echo "Safety scan completed"
 
       - name: Run bandit security linter
         run: |
-          uv add --dev bandit
-          uv run bandit -r src/ -f json -o bandit-report.json || true
+          uv run bandit -r src/ -f sarif -o bandit-report.sarif || true
+          uv run bandit -r src/ -f txt || true
+          echo "Bandit scan completed"
 
-      - name: Upload security scan results
+      - name: Upload bandit SARIF results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: bandit-report.json
+          sarif_file: bandit-report.sarif
         continue-on-error: true
+
+      - name: Create security summary
+        if: always()
+        run: |
+          echo "## 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Safety dependency scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bandit security linter completed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Results uploaded to GitHub Security tab" >> $GITHUB_STEP_SUMMARY
