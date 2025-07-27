@@ -259,6 +259,58 @@ uv run ruff check src/ --fix
 
 ## 🏗️ アーキテクチャ
 
+### システム全体フロー
+
+```mermaid
+flowchart TD
+    A[Gmail API] -->|メール取得| B[Email Filter]
+    B -->|フィルタリング| C{メール種別判定}
+    C -->|航空券| D[Flight Processor]
+    C -->|カーシェア| E[CarShare Processor]
+    D -->|AI解析| F[OpenAI API]
+    E -->|AI解析| F
+    F -->|構造化データ| G[重複検出]
+    G -->|新規/更新| H[Calendar Client]
+    H -->|予定作成| I[Google Calendar]
+    G -->|処理済み| J[Gmail Label]
+    F -->|使用量| K[Metrics Collector]
+    K -->|通知| L[Slack]
+```
+
+### データフロー詳細
+
+```mermaid
+sequenceDiagram
+    participant M as Main
+    participant G as Gmail Client
+    participant P as Processor Factory
+    participant F as Flight/CarShare Processor
+    participant O as OpenAI Client
+    participant C as Calendar Client
+    participant S as Slack
+
+    M->>G: メール取得（期間指定）
+    G->>M: サポート対象メール
+
+    loop 各メール処理
+        M->>P: プロセッサー取得
+        P->>F: 種別別プロセッサー
+        F->>O: AI解析実行
+        O->>F: 構造化データ
+        F->>C: 重複検出
+        alt 新規予約
+            C->>C: カレンダー予定作成
+        else 既存予約
+            C->>C: 予定更新
+        end
+        F->>G: 処理済みラベル付与
+    end
+
+    M->>S: 処理結果通知
+```
+
+### プロジェクト構造
+
 ```
 src/
 ├── 📁 models/           # Pydanticデータモデル
@@ -280,6 +332,31 @@ src/
 │   ├── 📄 logging.py       # 構造化ログ
 │   └── 📄 exceptions.py    # カスタム例外
 └── 📄 main.py          # エントリーポイント
+```
+
+### Cloud Run Jobs デプロイメント
+
+```mermaid
+flowchart LR
+    subgraph "GitHub Actions CI/CD"
+        A[Code Push] -->|Trigger| B[Build & Test]
+        B --> C[Docker Build]
+        C --> D[Cloud Build]
+    end
+
+    subgraph "Google Cloud Platform"
+        D --> E[Container Registry]
+        E --> F[Cloud Run Jobs]
+        G[Cloud Scheduler] -->|定期実行| F
+        F --> H[Secret Manager]
+        F --> I[BigQuery Logging]
+        F --> J[Gmail/Calendar APIs]
+    end
+
+    subgraph "外部サービス"
+        F --> K[OpenAI API]
+        F --> L[Slack Webhook]
+    end
 ```
 
 ### 設計パターン
