@@ -51,7 +51,7 @@ dev = [
     "pytest==8.4.1",
     "pytest-asyncio==1.0.0",
     "pytest-cov==6.2.1",
-    "coverage==7.10.5",
+    "coverage==7.10.6",
     "mypy==1.16.1",
     "ruff==0.12.7",
     "types-requests==2.32.4.20250611",
