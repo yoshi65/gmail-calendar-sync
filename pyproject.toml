@@ -27,7 +27,7 @@ classifiers = [
 ]
 requires-python = "==3.13.7"
 dependencies = [
-    "pydantic==2.11.7",
+    "pydantic==2.12.4",
     "pydantic-settings==2.10.1",
     "google-auth==2.40.3",
     "google-auth-oauthlib==1.2.2",
