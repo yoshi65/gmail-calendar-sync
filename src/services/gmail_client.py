@@ -331,9 +331,31 @@ class GmailClient:
         """Get all supported emails (flight and car sharing) from supported domains."""
         all_emails = []
 
+        # Get emails from supported domains
         for domain in self.settings.all_supported_domains:
             # Search for emails from this domain, excluding already processed ones
             query = f"from:{domain} -label:{self.settings.gmail_label}"
+            message_ids = self.search_emails(
+                query,
+                since_days=since_days,
+                since_hours=since_hours,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            for message_id in message_ids:
+                try:
+                    email_msg = self.get_email(message_id)
+                    all_emails.append(email_msg)
+                except Exception as e:
+                    logger.error(
+                        "Failed to get email", message_id=message_id, error=str(e)
+                    )
+
+        # Get forwarded emails if configured
+        for forwarded_email in self.settings.forwarded_from_email_list:
+            # Search for forwarded emails from this address, excluding already processed ones
+            query = f"from:{forwarded_email} -label:{self.settings.gmail_label}"
             message_ids = self.search_emails(
                 query,
                 since_days=since_days,

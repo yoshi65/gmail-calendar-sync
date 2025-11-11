@@ -26,9 +26,29 @@ class CarShareEmailProcessor(BaseEmailProcessor):
         self.calendar_client = CalendarClient(settings)
 
     def can_process(self, email: EmailMessage) -> bool:
-        """Check if this email is from a car sharing domain."""
+        """Check if this email is from a car sharing domain or a forwarded car sharing email."""
+        # Check if email is from a car sharing domain directly
         provider = get_provider_from_domain(email.domain)
-        return provider is not None
+        if provider is not None:
+            return True
+
+        # Check if email is from a forwarded email address
+        sender_email = email.sender.lower()
+        for forwarded_email in self.settings.forwarded_from_email_list:
+            if forwarded_email.lower() in sender_email:
+                # For forwarded emails, check if body/subject contains car sharing-related keywords
+                content = (email.subject + " " + email.body).lower()
+
+                # Check for car sharing-related keywords in content
+                carshare_keywords = [
+                    "カーシェア", "タイムズカー", "timescar", "carshare",
+                    "レンタカー", "rental car", "予約完了", "利用明細"
+                ]
+
+                if any(keyword in content for keyword in carshare_keywords):
+                    return True
+
+        return False
 
     def process(self, email: EmailMessage) -> ProcessingResult:
         """Process car sharing booking email."""

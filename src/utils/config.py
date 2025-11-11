@@ -40,13 +40,24 @@ class Settings(BaseSettings):
     gmail_label: str = "PROCESSED_BY_GMAIL_SYNC"
 
     # Supported email domains
-    flight_domains: list[str] = ["ana.co.jp", "booking.jal.com"]
+    flight_domains: list[str] = ["ana.co.jp", "booking.jal.com", "booking.airasia.com"]
     carshare_domains: list[str] = ["carshares.jp", "share.timescar.jp"]
+
+    # Forwarded emails support
+    # Comma-separated list of email addresses that forward booking emails
+    forwarded_from_emails: str = ""
 
     @property
     def all_supported_domains(self) -> list[str]:
         """Get all supported email domains."""
         return self.flight_domains + self.carshare_domains
+
+    @property
+    def forwarded_from_email_list(self) -> list[str]:
+        """Get list of forwarded email addresses."""
+        if not self.forwarded_from_emails:
+            return []
+        return [email.strip() for email in self.forwarded_from_emails.split(",") if email.strip()]
 
     def get_gmail_credentials(self) -> tuple[str, str, str]:
         """Get Gmail OAuth2 credentials (client_id, client_secret, refresh_token)."""
