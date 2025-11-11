@@ -48,7 +48,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.4.1",
+    "pytest==8.4.2",
     "pytest-asyncio==1.0.0",
     "pytest-cov==6.2.1",
     "coverage==7.10.6",
@@ -160,7 +160,7 @@ skips = ["*_test.py", "test_*.py"]
 dev = [
     "bandit[toml]==1.8.6",
     "pre-commit==4.2.0",
-    "pytest==8.4.1",
+    "pytest==8.4.2",
     "pytest-benchmark==5.1.0",
     "safety==3.2.9",
 ]
