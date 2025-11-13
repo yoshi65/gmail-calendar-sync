@@ -34,7 +34,7 @@ class OpenAIClient:
         self, email_content: str, email_subject: str = ""
     ) -> FlightBooking | None:
         """Extract flight booking information from email content."""
-        system_prompt = """You are an expert at extracting flight booking information from emails.
+        system_prompt = """You are an expert at extracting flight booking information from emails in multiple languages (Japanese, English, etc.).
 
 Extract flight booking details from the provided email and return them in the following JSON format:
 
@@ -72,15 +72,20 @@ Extract flight booking details from the provided email and return them in the fo
 }
 
 Important guidelines:
-- Always include timezone information in datetime fields (e.g., "2024-01-15T10:30:00+09:00")
-- Use 3-letter IATA airport codes (NRT, HND, LAX, etc.)
+- **Emails may be in Japanese, English, or other languages** - extract information regardless of language
+- **Ignore forwarded email headers** - Skip lines starting with ">" or sections like "---------- Forwarded message ---------"
+- Always include timezone information in datetime fields (e.g., "2024-01-15T10:30:00+09:00" or "2025-11-25T23:55:00+09:00")
+- Use 3-letter IATA airport codes (NRT, HND, LAX, KUL, BKK, etc.) - these are universal across languages
 - Extract passenger name exactly as it appears
 - If multiple passengers, use the first passenger's name
 - Return null if no valid flight information is found
 - Be precise with dates and times, including time zones if available
-- For confirmation_code: ONLY use values that appear after "確認番号" or "Confirmation Number" labels in the email. These are typically longer numeric codes (6+ digits). DO NOT use short numbers like "0709" or "0520" which are reservation numbers, not confirmation codes
-- For booking_reference: Extract the first reservation number (予約番号) found in the email
-- If you cannot find a line with "確認番号" label, return null for confirmation_code
+- **For confirmation_code/booking_reference**:
+  - Japanese: Look for "確認番号" or "予約番号" (typically 6-9 digits)
+  - English: Look for "Booking No", "Confirmation Number", "PNR" (may be 6-character alphanumeric like "I6U6TY")
+  - Accept both numeric-only and alphanumeric formats
+  - DO NOT use short numbers like "0709" which are likely dates
+- For international flights, pay special attention to timezone differences between departure and arrival
 """
 
         user_prompt = f"""Email Subject: {email_subject}

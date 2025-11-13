@@ -23,12 +23,15 @@ class FlightEmailProcessor(BaseEmailProcessor):
         self.calendar_client = CalendarClient(settings)
 
     def can_process(self, email: EmailMessage) -> bool:
-        """Check if this email is from a flight booking domain."""
-        domain = email.domain
+        """Check if this email is from a flight booking domain or a forwarded flight email."""
+        # Use original_domain for forwarded emails, domain for direct emails
+        domain = email.original_domain
+
         # Check for exact match or subdomain match
         for flight_domain in self.settings.flight_domains:
             if domain == flight_domain or domain.endswith("." + flight_domain):
                 return True
+
         return False
 
     def process(self, email: EmailMessage) -> ProcessingResult:

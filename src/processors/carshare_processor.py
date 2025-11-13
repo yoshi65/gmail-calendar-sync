@@ -26,9 +26,13 @@ class CarShareEmailProcessor(BaseEmailProcessor):
         self.calendar_client = CalendarClient(settings)
 
     def can_process(self, email: EmailMessage) -> bool:
-        """Check if this email is from a car sharing domain."""
-        provider = get_provider_from_domain(email.domain)
-        return provider is not None
+        """Check if this email is from a car sharing domain or a forwarded car sharing email."""
+        # Use original_domain for forwarded emails, domain for direct emails
+        provider = get_provider_from_domain(email.original_domain)
+        if provider is not None:
+            return True
+
+        return False
 
     def process(self, email: EmailMessage) -> ProcessingResult:
         """Process car sharing booking email."""
