@@ -35,7 +35,12 @@ class TestSettings:
             assert settings.sync_period_days == 30
             assert settings.log_level == "INFO"
             assert settings.gmail_label == "PROCESSED_BY_GMAIL_SYNC"
-            assert settings.flight_domains == ["ana.co.jp", "booking.jal.com"]
+            assert settings.flight_domains == [
+                "ana.co.jp",
+                "booking.jal.com",
+                "booking.airasia.com",
+                "airasia.com",
+            ]
             assert settings.slack_webhook_url is None
 
         finally:
