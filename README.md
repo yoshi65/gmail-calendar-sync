@@ -2,7 +2,7 @@
 
 ✈️🚗 航空券・カーシェア予約メールを自動的にGoogle Calendarの予定として追加するPythonアプリケーション
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.13+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Cloud Run](https://img.shields.io/badge/deploy-Cloud%20Run%20Jobs-blue)
 
@@ -37,7 +37,7 @@ OpenAI APIを使用してメール内容を自動解析し、Cloud Run Jobsで�
 
 ## 📋 前提条件
 
-- Python 3.11+
+- Python 3.13+
 - [uv](https://github.com/astral-sh/uv) (推奨) または pip
 - Google Cloud Platform アカウント
 - OpenAI API アカウント
