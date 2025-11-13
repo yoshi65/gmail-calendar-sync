@@ -80,5 +80,5 @@ LICENSE
 SECURITY.md
 CONTRIBUTING.md
 
-# Tests (not needed in container)
-tests/
+# Note: tests/ is included in build context for multi-stage Docker builds
+# The test stage requires tests/, but the final production image doesn't include them
