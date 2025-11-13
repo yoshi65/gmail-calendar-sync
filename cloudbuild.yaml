@@ -12,9 +12,9 @@ steps:
       echo "BUILD_ID: $BUILD_ID"
       echo "_ARTIFACT_REGISTRY_URL: ${_ARTIFACT_REGISTRY_URL}"
 
-  # Build the container image
+  # Build the container image (production target only)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '--progress=plain', '.']
+    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '--target=production', '--progress=plain', '.']
 
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
