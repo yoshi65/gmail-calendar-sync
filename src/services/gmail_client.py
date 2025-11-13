@@ -168,6 +168,9 @@ class GmailClient:
             # Extract body
             body = self._extract_body(message["payload"])
 
+            # Detect forwarded email and extract original sender
+            is_forwarded, original_sender = self._detect_forwarded_email(body, subject)
+
             # Get labels
             labels = message.get("labelIds", [])
 
@@ -179,6 +182,8 @@ class GmailClient:
                 received_at=received_at,
                 thread_id=message["threadId"],
                 labels=labels,
+                is_forwarded=is_forwarded,
+                original_sender=original_sender,
             )
 
         except HttpError as error:
@@ -186,40 +191,106 @@ class GmailClient:
             raise
 
     def _extract_body(self, payload: Any) -> str:
-        """Extract email body from payload."""
-        body = ""
+        """Extract email body from payload, handling nested multipart structures."""
 
-        if "parts" in payload:
-            # Multipart message
-            for part in payload["parts"]:
-                if part["mimeType"] == "text/plain":
-                    if "data" in part["body"]:
-                        body += base64.urlsafe_b64decode(part["body"]["data"]).decode(
+        def extract_from_part(part: Any) -> str:
+            """Recursively extract text from a MIME part."""
+            mime_type = part.get("mimeType", "")
+
+            # Handle nested multipart structures (e.g., multipart/mixed, multipart/alternative)
+            if "parts" in part:
+                extracted = ""
+                for nested_part in part["parts"]:
+                    text = extract_from_part(nested_part)
+                    if text:
+                        extracted += text
+                return extracted
+
+            # Extract text/plain content
+            if mime_type == "text/plain":
+                if "data" in part.get("body", {}):
+                    try:
+                        return base64.urlsafe_b64decode(part["body"]["data"]).decode(
                             "utf-8"
                         )
-                elif part["mimeType"] == "text/html" and not body:
-                    # Use HTML if no plain text found
-                    if "data" in part["body"]:
+                    except Exception as e:
+                        logger.warning("Failed to decode text/plain part", error=str(e))
+                        return ""
+
+            # Extract text/html as fallback
+            elif mime_type == "text/html":
+                if "data" in part.get("body", {}):
+                    try:
                         html_body = base64.urlsafe_b64decode(
                             part["body"]["data"]
                         ).decode("utf-8")
                         # Simple HTML to text conversion
                         import re
 
-                        body = re.sub(r"<[^>]+>", "", html_body)
-        else:
-            # Single part message
-            if payload["mimeType"] in ["text/plain", "text/html"]:
-                if "data" in payload["body"]:
-                    body = base64.urlsafe_b64decode(payload["body"]["data"]).decode(
-                        "utf-8"
-                    )
-                    if payload["mimeType"] == "text/html":
-                        import re
+                        return re.sub(r"<[^>]+>", "", html_body)
+                    except Exception as e:
+                        logger.warning("Failed to decode text/html part", error=str(e))
+                        return ""
 
-                        body = re.sub(r"<[^>]+>", "", body)
+            return ""
 
+        # Start extraction from root payload
+        body = extract_from_part(payload)
         return body.strip()
+
+    def _detect_forwarded_email(
+        self, body: str, subject: str
+    ) -> tuple[bool, str | None]:
+        """Detect if email is forwarded and extract original sender.
+
+        Args:
+            body: Email body text
+            subject: Email subject
+
+        Returns:
+            Tuple of (is_forwarded, original_sender)
+        """
+        import re
+
+        # Check for forwarded subject
+        if not (
+            subject.lower().startswith("fwd:")
+            or subject.lower().startswith("fw:")
+            or "転送:" in subject
+        ):
+            return False, None
+
+        # Debug: Log body snippet to check content
+        logger.debug(
+            "Checking forwarded email",
+            subject=subject,
+            body_preview=body[:500] if body else "EMPTY",
+            has_forwarded_marker="---------- Forwarded message" in body,
+        )
+
+        # Gmail forwarded message pattern
+        if "---------- Forwarded message" not in body:
+            return False, None
+
+        # Extract original sender from forwarded message header
+        # Pattern: From: <email@domain.com> or From: Name <email@domain.com>
+        pattern = r"From:\s*<?([^<>\s]+@[^<>\s]+)>?"
+        match = re.search(pattern, body)
+
+        if match:
+            original_sender = match.group(1).strip()
+            logger.debug(
+                "Detected forwarded email",
+                original_sender=original_sender,
+                subject=subject,
+            )
+            return True, original_sender
+
+        logger.warning(
+            "Forwarded email detected but could not extract original sender",
+            subject=subject,
+        )
+        return True, None
 
     def add_label(self, message_id: str, label_name: str) -> bool:
         """Add label to an email."""
@@ -328,7 +399,7 @@ class GmailClient:
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> list[EmailMessage]:
-        """Get all supported emails (flight and car sharing) from supported domains."""
+        """Get all supported emails (flight and car sharing) from supported domains and forwarded emails."""
         all_emails = []
 
         # Get emails from supported domains
@@ -355,7 +426,7 @@ class GmailClient:
         # Get forwarded emails if configured
         for forwarded_email in self.settings.forwarded_from_email_list:
             # Search for forwarded emails from this address, excluding already processed ones
-            query = f"from:{forwarded_email} -label:{self.settings.gmail_label}"
+            query = f"from:{forwarded_email} (subject:Fwd OR subject:Fw OR subject:転送) -label:{self.settings.gmail_label}"
             message_ids = self.search_emails(
                 query,
                 since_days=since_days,

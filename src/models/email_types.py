@@ -25,6 +25,8 @@ class EmailMessage(BaseModel):
     received_at: datetime
     thread_id: str
     labels: list[str] = Field(default_factory=list)
+    is_forwarded: bool = False
+    original_sender: str | None = None
 
     @property
     def domain(self) -> str:
@@ -36,6 +38,18 @@ class EmailMessage(BaseModel):
                 domain_part = domain_part.split(">")[0]
             return domain_part.strip()
         return ""
+
+    @property
+    def original_domain(self) -> str:
+        """Extract domain from original sender if forwarded, otherwise from sender."""
+        if self.is_forwarded and self.original_sender:
+            if "@" in self.original_sender:
+                domain_part = self.original_sender.split("@")[-1].lower()
+                # Remove any trailing > or other characters
+                if ">" in domain_part:
+                    domain_part = domain_part.split(">")[0]
+                return domain_part.strip()
+        return self.domain
 
 
 class ProcessingResult(BaseModel):

@@ -24,29 +24,13 @@ class FlightEmailProcessor(BaseEmailProcessor):
 
     def can_process(self, email: EmailMessage) -> bool:
         """Check if this email is from a flight booking domain or a forwarded flight email."""
-        domain = email.domain
+        # Use original_domain for forwarded emails, domain for direct emails
+        domain = email.original_domain
 
-        # Check for exact match or subdomain match in direct emails
+        # Check for exact match or subdomain match
         for flight_domain in self.settings.flight_domains:
             if domain == flight_domain or domain.endswith("." + flight_domain):
                 return True
-
-        # Check if email is from a forwarded email address
-        sender_email = email.sender.lower()
-        for forwarded_email in self.settings.forwarded_from_email_list:
-            if forwarded_email.lower() in sender_email:
-                # For forwarded emails, check if body/subject contains flight-related keywords
-                content = (email.subject + " " + email.body).lower()
-
-                # Check for flight-related keywords in content
-                flight_keywords = [
-                    "flight", "booking", "reservation", "itinerary",
-                    "航空券", "予約", "フライト", "搭乗", "booking no",
-                    "airasia", "ana", "jal", "airline"
-                ]
-
-                if any(keyword in content for keyword in flight_keywords):
-                    return True
 
         return False
 
