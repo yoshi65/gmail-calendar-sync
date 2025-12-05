@@ -76,4 +76,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import src.main; print('Health check passed')" || exit 1
 
 # Set default command
-CMD ["uv", "run", "python", "-m", "src.main"]
+CMD ["python", "-m", "src.main"]
