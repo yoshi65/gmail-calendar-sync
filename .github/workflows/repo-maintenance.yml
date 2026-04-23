@@ -55,8 +55,9 @@ jobs:
 
       - name: Clean up old images (keep 10 most recent)
         env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
+          GCP_PROJECT_ID=$(echo "$GCP_SA_KEY" | jq -r '.project_id')
           REGISTRY="asia-northeast1-docker.pkg.dev/${GCP_PROJECT_ID}/gmail-calendar-sync/gmail-calendar-sync"
 
           # List digests sorted by update time (newest first), skip first 10, delete the rest
