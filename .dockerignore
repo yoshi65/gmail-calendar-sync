@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.omc
+.claude
+
+# Documentation
+*.md
+
+# Python artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+dist
+build
+
+# Virtual environments
+.venv
+venv
+
+# Test and coverage
+htmlcov
+.coverage
+.coverage.*
+coverage.xml
+*.sarif
+
+# Type checking and linting
+.mypy_cache
+.ruff_cache
+.pytest_cache
+
+# Local dev files
+.env
+.env.*
+token.json
+credentials.json
+get_refresh_token.py
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Pre-commit
+.pre-commit-config.yaml
