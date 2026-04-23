@@ -38,40 +38,6 @@ jobs:
           sed 's|origin/||' |
           xargs -I {} git push origin --delete {} || true
 
-  cleanup-artifact-registry:
-    runs-on: ubuntu-latest
-    environment: production
-    permissions:
-      contents: read
-
-    steps:
-      - name: Google Auth
-        uses: 'google-github-actions/auth@v2'
-        with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
-      - name: Set up Cloud SDK
-        uses: 'google-github-actions/setup-gcloud@v2'
-
-      - name: Clean up old images (keep 10 most recent)
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-        run: |
-          GCP_PROJECT_ID=$(echo "$GCP_SA_KEY" | jq -r '.project_id')
-          REGISTRY="asia-northeast1-docker.pkg.dev/${GCP_PROJECT_ID}/gmail-calendar-sync/gmail-calendar-sync"
-
-          # List digests sorted by update time (newest first), skip first 10, delete the rest
-          gcloud artifacts docker images list "$REGISTRY" \
-            --include-tags \
-            --sort-by="~update_time" \
-            --format="value(DIGEST)" \
-            | tail -n +11 \
-            | while read digest; do
-                echo "Deleting $REGISTRY@$digest"
-                gcloud artifacts docker images delete "$REGISTRY@$digest" --quiet --async || true
-              done
-          echo "Artifact Registry cleanup complete"
-
   update-docs:
     runs-on: ubuntu-latest
     needs: cleanup
