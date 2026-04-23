@@ -47,7 +47,7 @@ jobs:
           echo "- 🌿 Branch: ${GITHUB_REF_NAME}" >> $GITHUB_STEP_SUMMARY
 
           # Check if the Cloud Run job exists and is ready
-          JOB_NAME="gmail-calendar-sync"
+          JOB_NAME="gmail-calendar-sync-job"
           REGION="asia-northeast1"
 
           echo "### Service Health" >> $GITHUB_STEP_SUMMARY

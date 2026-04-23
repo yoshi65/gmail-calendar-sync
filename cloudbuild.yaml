@@ -14,11 +14,27 @@ steps:
 
   # Build the container image (defaults to last stage: production)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA', '--progress=plain', '.']
+    env:
+      - 'DOCKER_BUILDKIT=1'
+    args:
+      - 'build'
+      - '-t'
+      - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA'
+      - '-t'
+      - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:latest'
+      - '--build-arg'
+      - 'BUILDKIT_INLINE_CACHE=1'
+      - '--cache-from'
+      - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:latest'
+      - '--progress=plain'
+      - '.'
 
   # Push the container image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:latest']
 
   # Deploy container image to Cloud Run Jobs
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -58,6 +74,7 @@ steps:
 
 images:
   - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:$SHORT_SHA'
+  - '${_ARTIFACT_REGISTRY_URL}/gmail-calendar-sync:latest'
 
 # Substitution variables
 substitutions:
