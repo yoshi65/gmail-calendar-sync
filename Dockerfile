@@ -10,7 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /usr/local/bin/uv
 
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-cache --no-dev
 
 

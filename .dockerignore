@@ -10,6 +10,7 @@
 
 # Documentation
 *.md
+!README.md
 
 # Python artifacts
 __pycache__
