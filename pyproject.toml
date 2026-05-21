@@ -158,7 +158,7 @@ skips = ["*_test.py", "test_*.py"]
 
 [dependency-groups]
 dev = [
-    "bandit[toml]==1.8.6",
+    "bandit[toml]==1.9.4",
     "pre-commit==4.2.0",
     "pytest==8.4.2",
     "pytest-benchmark==5.1.0",
