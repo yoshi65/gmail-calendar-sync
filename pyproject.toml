@@ -34,7 +34,7 @@ dependencies = [
     "google-auth-httplib2==0.2.1",
     "google-api-python-client==2.176.0",
     "openai==1.95.1",
-    "python-dotenv==1.1.1",
+    "python-dotenv==1.2.2",
     "structlog==25.4.0",
     "httpx==0.28.1",
 ]
