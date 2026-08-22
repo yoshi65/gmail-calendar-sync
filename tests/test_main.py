@@ -591,3 +591,33 @@ class TestMain:
 
         # Assert
         mock_exit.assert_called_once_with(1)
+
+    @patch("src.main.get_metrics_collector")
+    @patch("src.main.setup_logging")
+    @patch("httpx.post")
+    @patch("src.main.GmailClient")
+    @patch("src.main.get_settings")
+    def test_main_notifies_slack_when_sync_aborts(
+        self,
+        mock_get_settings,
+        mock_gmail_client_class,
+        mock_post,
+        mock_setup_logging,
+        mock_get_metrics,
+    ):
+        """Test that an aborted sync sends a Slack notification."""
+        # Setup
+        mock_settings = Mock()
+        mock_settings.slack_webhook_url = "https://hooks.slack.com/test"
+        mock_get_settings.return_value = mock_settings
+        mock_gmail_client_class.side_effect = GmailCalendarSyncError(
+            "invalid_grant: Bad Request"
+        )
+
+        # Execute
+        with patch("sys.exit"):
+            main()
+
+        # Assert
+        mock_post.assert_called_once()
+        assert "invalid_grant" in mock_post.call_args.kwargs["json"]["text"]
