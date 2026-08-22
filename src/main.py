@@ -265,10 +265,39 @@ def send_slack_notification(
         logger.error("Failed to send Slack notification", error=str(e))
 
 
+def send_slack_error_notification(error: Exception, settings: Settings) -> None:
+    """Send Slack notification when the sync aborts before completion.
+
+    send_slack_notification() only runs on the completion path, so failures such
+    as an expired refresh token would otherwise go unnoticed.
+    """
+    if not settings.slack_webhook_url:
+        return
+
+    logger = structlog.get_logger()
+
+    try:
+        import httpx
+
+        message = "🚨 Gmail Calendar Sync Failed\n"
+        message += f"{type(error).__name__}: {error}"
+
+        payload = {"text": message}
+
+        response = httpx.post(settings.slack_webhook_url, json=payload, timeout=10)
+        response.raise_for_status()
+
+        logger.info("Sent Slack error notification", error=str(error))
+
+    except Exception as e:
+        logger.error("Failed to send Slack error notification", error=str(e))
+
+
 def main() -> None:
     """Main function."""
     setup_logging()
     logger = structlog.get_logger()
+    settings: Settings | None = None
 
     try:
         logger.info("Starting Gmail Calendar Sync")
@@ -336,9 +365,13 @@ def main() -> None:
 
     except GmailCalendarSyncError as e:
         logger.error("Gmail Calendar Sync error", error=str(e))
+        if settings is not None:
+            send_slack_error_notification(e, settings)
         sys.exit(1)
     except Exception as e:
         logger.error("Unexpected error", error=str(e))
+        if settings is not None:
+            send_slack_error_notification(e, settings)
         sys.exit(1)
 
 

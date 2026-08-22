@@ -579,9 +579,14 @@ class TestMain:
         mock_send_slack.assert_called_once_with(mock_results, mock_settings)
         mock_exit.assert_called_once_with(1)
 
+    @patch("src.main.send_slack_error_notification")
     @patch("src.main.get_metrics_collector")
-    def test_main_metrics_collection_error(self, mock_get_metrics):
-        """Test main when metrics collection fails."""
+    def test_main_metrics_collection_error(self, mock_get_metrics, mock_send_error):
+        """Test main when metrics collection fails.
+
+        send_slack_error_notification is patched because this test does not mock
+        get_settings, so the real webhook URL from .env would otherwise be used.
+        """
         # Setup
         mock_get_metrics.side_effect = Exception("Metrics error")
 
@@ -591,3 +596,33 @@ class TestMain:
 
         # Assert
         mock_exit.assert_called_once_with(1)
+
+    @patch("src.main.get_metrics_collector")
+    @patch("src.main.setup_logging")
+    @patch("httpx.post")
+    @patch("src.main.GmailClient")
+    @patch("src.main.get_settings")
+    def test_main_notifies_slack_when_sync_aborts(
+        self,
+        mock_get_settings,
+        mock_gmail_client_class,
+        mock_post,
+        mock_setup_logging,
+        mock_get_metrics,
+    ):
+        """Test that an aborted sync sends a Slack notification."""
+        # Setup
+        mock_settings = Mock()
+        mock_settings.slack_webhook_url = "https://hooks.slack.com/test"
+        mock_get_settings.return_value = mock_settings
+        mock_gmail_client_class.side_effect = GmailCalendarSyncError(
+            "invalid_grant: Bad Request"
+        )
+
+        # Execute
+        with patch("sys.exit"):
+            main()
+
+        # Assert
+        mock_post.assert_called_once()
+        assert "invalid_grant" in mock_post.call_args.kwargs["json"]["text"]
