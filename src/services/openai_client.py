@@ -98,9 +98,7 @@ Email Content:
 Extract the flight booking information from this email and return it as JSON."""
 
         try:
-            logger.info(
-                "Extracting flight info from email", subject=email_subject[:100]
-            )
+            logger.info("Extracting flight info from email")
 
             # Start timing
             start_time = time.time()
@@ -145,7 +143,6 @@ Extract the flight booking information from this email and return it as JSON."""
             )
 
             content = response.choices[0].message.content
-            logger.debug("OpenAI response", content=content)
 
             if not content:
                 logger.info("No flight information found in email")
@@ -381,7 +378,6 @@ Extract the car sharing booking information from this email and return it as JSO
         try:
             logger.info(
                 "Extracting car sharing info from email",
-                subject=email_subject[:100],
                 provider=provider,
             )
 
@@ -428,7 +424,6 @@ Extract the car sharing booking information from this email and return it as JSO
             )
 
             content = response.choices[0].message.content
-            logger.debug("OpenAI response", content=content)
 
             if not content:
                 logger.info("No car sharing information found in email")

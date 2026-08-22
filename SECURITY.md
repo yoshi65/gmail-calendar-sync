@@ -31,7 +31,7 @@ If you discover a security vulnerability in Gmail Calendar Sync, please report i
 
 #### API Keys & Credentials
 - Never commit API keys to the repository
-- Use GitHub Secrets for production deployments
+- Store the deploy credential in GitHub Secrets; runtime secrets are injected from GCP Secret Manager
 - Rotate credentials regularly
 
 #### Data Handling
@@ -61,7 +61,7 @@ If you discover a security vulnerability in Gmail Calendar Sync, please report i
    - Regularly update dependencies via `uv sync`
 
 2. **Production Deployment**:
-   - Use GitHub Environments for secret management
+   - Runtime secrets are managed in GCP Secret Manager and injected into the Cloud Run Job
    - Enable branch protection rules
    - Monitor execution logs for anomalies
 
