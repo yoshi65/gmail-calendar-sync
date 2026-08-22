@@ -35,21 +35,22 @@ If you discover a security vulnerability in Gmail Calendar Sync, please report i
 - Rotate credentials regularly
 
 #### Data Handling
-- Email content is processed locally and not stored
-- Personal information is automatically masked in logs
-- OpenAI API calls include only necessary email data
+- Email content is processed transiently and not persisted
+- Personal data (passenger/user names, raw model output) is kept out of application logs
+- OpenAI API calls include only the email content needed for extraction, and email text is treated as untrusted input
 
 #### Dependencies
-- Renovate automatically monitors for security vulnerabilities
-- Critical security updates are auto-merged after CI passes
+- Renovate monitors dependencies for known vulnerabilities
+- Dependency update PRs run the full CI suite before merging
 - Regular dependency audits via GitHub security alerts
 
 ## Security Features
 
 - **OAuth2 Authentication**: Secure Google API access
-- **Minimal Permissions**: Only necessary Gmail/Calendar scopes
-- **Environment Isolation**: Production secrets managed via GitHub Environments
-- **Audit Logging**: Structured logging with automatic PII masking
+- **Minimal Permissions**: `gmail.modify` and `calendar.events` scopes only
+- **Secret Management**: Production credentials stored in GCP Secret Manager and injected at runtime
+- **Untrusted-Input Handling**: Email text is treated as untrusted; OpenAI responses are constrained to JSON and check-in URLs are validated
+- **Audit Logging**: Structured JSON logging that excludes personal data
 - **Dependency Scanning**: Automated vulnerability detection via Renovate + OSV
 
 ## Best Practices for Users
