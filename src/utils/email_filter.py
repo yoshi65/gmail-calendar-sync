@@ -209,7 +209,7 @@ class EmailFilter:
         # Very strong indicators in subject line (multiple promotional keywords)
         if promotional_subject_matches >= 2:
             is_promotional = True
-            logger.info(
+            logger.debug(
                 "Email identified as promotional (multiple subject patterns)",
                 email_id=email.id,
                 subject=subject[:100],
@@ -219,7 +219,7 @@ class EmailFilter:
         # Strong promotional pattern in subject + body evidence
         elif promotional_subject_matches >= 1 and promotional_body_matches >= 2:
             is_promotional = True
-            logger.info(
+            logger.debug(
                 "Email identified as promotional (subject + multiple body patterns)",
                 email_id=email.id,
                 subject=subject[:100],
@@ -230,7 +230,7 @@ class EmailFilter:
         # Very high volume of promotional content in body only
         elif promotional_body_matches >= 3:
             is_promotional = True
-            logger.info(
+            logger.debug(
                 "Email identified as promotional (many body patterns)",
                 email_id=email.id,
                 subject=subject[:100],
