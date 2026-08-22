@@ -27,6 +27,11 @@
   },
   "packageRules": [
     {
+      "description": "requires-python は .python-version と衝突するためピン留めしない",
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    },
+    {
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "dev dependencies",
