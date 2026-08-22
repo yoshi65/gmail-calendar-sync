@@ -2,7 +2,17 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    HttpUrl,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+)
+
+# Reused adapter so an injected/malformed check-in URL is validated in isolation.
+_CHECKIN_URL_ADAPTER = TypeAdapter(HttpUrl)
 
 
 class Airport(BaseModel):
@@ -54,8 +64,24 @@ class FlightBooking(BaseModel):
     total_price: str | None = Field(None, description="Total price with currency")
 
     # Check-in information
-    checkin_url: str | None = Field(None, description="Online check-in URL")
+    checkin_url: HttpUrl | None = Field(None, description="Online check-in URL")
     checkin_opens: datetime | None = Field(None, description="When check-in opens")
+
+    @field_validator("checkin_url", mode="before")
+    @classmethod
+    def sanitize_checkin_url(cls, v: object) -> object:
+        """Coerce a malformed or non-http(s) check-in URL to None.
+
+        The value originates from an LLM parsing untrusted email text, so a
+        crafted email could try to plant a phishing link. Returning None for an
+        invalid URL neutralizes the link without discarding the valid booking.
+        """
+        if not v:
+            return None
+        try:
+            return _CHECKIN_URL_ADAPTER.validate_python(v)
+        except ValidationError:
+            return None
 
     @property
     def departure_date(self) -> datetime:

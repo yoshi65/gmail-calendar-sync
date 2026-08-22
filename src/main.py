@@ -80,7 +80,6 @@ def process_emails(
         logger.info(
             "Processing email",
             email_id=email.id,
-            subject=email.subject[:100],
             domain=email.domain,
         )
 
@@ -147,13 +146,11 @@ def process_emails(
                     logger.info(
                         "Skipped promotional email",
                         email_id=email.id,
-                        subject=email.subject[:100],
                     )
                 elif result.error_message == "No flight information found in email":
                     logger.info(
                         "No flight information found in email",
                         email_id=email.id,
-                        subject=email.subject[:100],
                     )
                 elif (
                     result.error_message == "No car sharing information found in email"
@@ -161,7 +158,6 @@ def process_emails(
                     logger.info(
                         "No car sharing information found in email",
                         email_id=email.id,
-                        subject=email.subject[:100],
                     )
                 else:
                     logger.warning(
@@ -265,6 +261,34 @@ def send_slack_notification(
         logger.error("Failed to send Slack notification", error=str(e))
 
 
+def _summarize_sync_error(error: Exception) -> str:
+    """Build a Slack-safe one-line summary of a fatal error.
+
+    Third-party exceptions can carry arbitrary text in their message, so only
+    app-defined exceptions (whose messages we control) are forwarded verbatim.
+    An expired refresh token — the reason this notification exists — is turned
+    into an actionable message instead of a raw library string.
+    """
+    from google.auth.exceptions import RefreshError
+
+    error_type = type(error).__name__
+
+    # invalid_grant is the signature of an expired/revoked refresh token; it can
+    # surface as a RefreshError or wrapped inside an app exception.
+    if isinstance(error, RefreshError) or "invalid_grant" in str(error):
+        return (
+            f"{error_type}: 認証トークンの更新に失敗しました。"
+            "リフレッシュトークンが失効した可能性があります"
+            "（get_refresh_token.py で再発行してください）。"
+        )
+
+    if isinstance(error, GmailCalendarSyncError):
+        return f"{error_type}: {error}"
+
+    # Unknown/third-party exceptions: forward only the type, keep details in logs.
+    return f"{error_type}（詳細はログを確認してください）"
+
+
 def send_slack_error_notification(error: Exception, settings: Settings) -> None:
     """Send Slack notification when the sync aborts before completion.
 
@@ -280,7 +304,7 @@ def send_slack_error_notification(error: Exception, settings: Settings) -> None:
         import httpx
 
         message = "🚨 Gmail Calendar Sync Failed\n"
-        message += f"{type(error).__name__}: {error}"
+        message += _summarize_sync_error(error)
 
         payload = {"text": message}
 

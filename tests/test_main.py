@@ -3,9 +3,16 @@
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
-from src.main import main, process_emails, setup_logging
+from google.auth.exceptions import RefreshError
+
+from src.main import (
+    _summarize_sync_error,
+    main,
+    process_emails,
+    setup_logging,
+)
 from src.models.email_types import EmailType, ProcessingResult
-from src.utils.exceptions import GmailCalendarSyncError
+from src.utils.exceptions import GmailAPIError, GmailCalendarSyncError
 
 
 class TestSetupLogging:
@@ -625,4 +632,34 @@ class TestMain:
 
         # Assert
         mock_post.assert_called_once()
-        assert "invalid_grant" in mock_post.call_args.kwargs["json"]["text"]
+        # invalid_grant is mapped to an actionable refresh-token message
+        assert "リフレッシュトークン" in mock_post.call_args.kwargs["json"]["text"]
+
+
+class TestSummarizeSyncError:
+    """Tests for _summarize_sync_error (Slack-safe error summaries)."""
+
+    def test_invalid_grant_maps_to_refresh_message(self):
+        """invalid_grant wrapped in an app error becomes an actionable message."""
+        msg = _summarize_sync_error(
+            GmailCalendarSyncError("invalid_grant: Bad Request")
+        )
+        assert "リフレッシュトークン" in msg
+        assert "get_refresh_token.py" in msg
+
+    def test_refresh_error_maps_to_refresh_message(self):
+        """A raw RefreshError is mapped to the refresh-token message."""
+        msg = _summarize_sync_error(RefreshError("token has expired"))
+        assert "リフレッシュトークン" in msg
+
+    def test_app_error_message_is_forwarded(self):
+        """App-defined exception messages are under our control and forwarded."""
+        msg = _summarize_sync_error(GmailAPIError("gmail api quota exceeded"))
+        assert "GmailAPIError" in msg
+        assert "gmail api quota exceeded" in msg
+
+    def test_unknown_error_forwards_type_only(self):
+        """Third-party exception text is not forwarded to Slack, only its type."""
+        msg = _summarize_sync_error(ValueError("sensitive token abc123 leaked"))
+        assert "ValueError" in msg
+        assert "sensitive token abc123 leaked" not in msg
