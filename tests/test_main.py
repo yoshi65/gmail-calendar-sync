@@ -579,9 +579,14 @@ class TestMain:
         mock_send_slack.assert_called_once_with(mock_results, mock_settings)
         mock_exit.assert_called_once_with(1)
 
+    @patch("src.main.send_slack_error_notification")
     @patch("src.main.get_metrics_collector")
-    def test_main_metrics_collection_error(self, mock_get_metrics):
-        """Test main when metrics collection fails."""
+    def test_main_metrics_collection_error(self, mock_get_metrics, mock_send_error):
+        """Test main when metrics collection fails.
+
+        send_slack_error_notification is patched because this test does not mock
+        get_settings, so the real webhook URL from .env would otherwise be used.
+        """
         # Setup
         mock_get_metrics.side_effect = Exception("Metrics error")
 
