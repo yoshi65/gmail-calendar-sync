@@ -136,6 +136,48 @@ class TestFlightBooking:
         assert booking.return_date is not None
         assert len(booking.return_segments) == 1
 
+    def test_checkin_url_valid_https_is_kept(self, sample_segment):
+        """A well-formed https check-in URL is preserved."""
+        booking = FlightBooking(
+            passenger_name="Taro Yamada",
+            outbound_segments=[sample_segment],
+            checkin_url="https://checkin.ana.co.jp/abc",
+        )
+
+        assert booking.checkin_url is not None
+        assert "checkin.ana.co.jp/abc" in str(booking.checkin_url)
+
+    def test_checkin_url_malformed_is_dropped(self, sample_segment):
+        """A malformed URL is coerced to None instead of dropping the booking."""
+        booking = FlightBooking(
+            passenger_name="Taro Yamada",
+            outbound_segments=[sample_segment],
+            checkin_url="not a url",
+        )
+
+        assert booking.checkin_url is None
+        # The rest of the booking survives.
+        assert booking.passenger_name == "Taro Yamada"
+
+    def test_checkin_url_non_http_scheme_is_dropped(self, sample_segment):
+        """A javascript: (or other non-http) URL is neutralized to None."""
+        booking = FlightBooking(
+            passenger_name="Taro Yamada",
+            outbound_segments=[sample_segment],
+            checkin_url="javascript:alert(document.cookie)",
+        )
+
+        assert booking.checkin_url is None
+
+    def test_checkin_url_defaults_to_none(self, sample_segment):
+        """No check-in URL stays None."""
+        booking = FlightBooking(
+            passenger_name="Taro Yamada",
+            outbound_segments=[sample_segment],
+        )
+
+        assert booking.checkin_url is None
+
 
 class TestEmailMessage:
     """Test EmailMessage model."""
@@ -308,6 +350,7 @@ class TestCarShareBooking:
         assert booking.start_time == start_time
         assert booking.end_time == end_time
         assert booking.station.station_name == "新宿ステーション"
+        assert booking.car is not None
         assert booking.car.car_type == "デミオ"
         assert booking.total_price == "¥1,200"
 

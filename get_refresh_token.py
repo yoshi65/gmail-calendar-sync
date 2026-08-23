@@ -5,11 +5,13 @@ import os
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# OAuth2 scopes for Gmail and Calendar
+# OAuth2 scopes for Gmail and Calendar (least privilege).
+# gmail.modify already includes read access, so gmail.readonly is redundant.
+# calendar.events is used because the app only touches events, never calendar
+# settings, sharing, or ACLs.
 SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/calendar.events",
 ]
 
 

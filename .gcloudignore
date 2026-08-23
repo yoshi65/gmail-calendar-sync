@@ -62,12 +62,13 @@ coverage.xml
 *.log
 
 # Local development files
-.env.local
-.env.development
+.env.*
 debug_*.py
 cleanup_*.py
 
-# Don't include service account keys in build (if any)
+# Credentials / tokens (never ship to the build context)
+token.json
+credentials.json
 **/service-account-key.json
 sakeys/
 

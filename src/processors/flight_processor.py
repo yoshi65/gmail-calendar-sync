@@ -39,7 +39,6 @@ class FlightEmailProcessor(BaseEmailProcessor):
         logger.info(
             "Processing flight email",
             email_id=email.id,
-            subject=email.subject[:100],
             domain=email.domain,
         )
 
@@ -49,7 +48,6 @@ class FlightEmailProcessor(BaseEmailProcessor):
                 logger.info(
                     "Skipping non-booking email based on subject",
                     email_id=email.id,
-                    subject=email.subject[:100],
                 )
                 return ProcessingResult(
                     email_id=email.id,
@@ -63,7 +61,6 @@ class FlightEmailProcessor(BaseEmailProcessor):
                 logger.info(
                     "Skipping promotional email",
                     email_id=email.id,
-                    subject=email.subject[:100],
                 )
                 return ProcessingResult(
                     email_id=email.id,
