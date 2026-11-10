@@ -40,7 +40,7 @@ def test_extraction_failure_reaches_summary(kind, response):
         client.client.chat.completions.create.side_effect = response
     else:
         result = Mock()
-        result.usage = None
+        result.usage = Mock(prompt_tokens=10, completion_tokens=5, total_tokens=15)
         result.choices = [Mock(message=Mock(content=response))]
         client.client.chat.completions.create.return_value = result
     processor_type = (
@@ -67,7 +67,10 @@ def test_extraction_failure_reaches_summary(kind, response):
     assert len(results) == 1
     assert not results[0].success
     assert results[0].error_message is not None
-    assert results[0].error_message.startswith("Processing error:")
+    expected = (
+        "OpenAIAPIError" if isinstance(response, Exception) else "DataExtractionError"
+    )
+    assert results[0].error_message == f"Processing error: {expected}"
     assert "private response" not in results[0].error_message
     gmail.add_label.assert_not_called()
     processor.calendar_client.create_events.assert_not_called()

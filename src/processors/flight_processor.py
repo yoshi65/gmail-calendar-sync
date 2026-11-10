@@ -107,7 +107,9 @@ class FlightEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to process flight email", email_id=email.id, error=str(e)
+                "Failed to process flight email",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
 
             return ProcessingResult(
@@ -132,7 +134,9 @@ class FlightEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to extract flight data", email_id=email.id, error=str(e)
+                "Failed to extract flight data",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
             raise
 
@@ -156,12 +160,6 @@ class FlightEmailProcessor(BaseEmailProcessor):
             for event in new_calendar_events:
                 event.source_domain = email.original_domain
             new_calendar_events.sort(key=lambda event: event.start_time)
-            existing_events.sort(
-                key=lambda event: datetime.fromisoformat(
-                    event["start"]["dateTime"].replace("Z", "+00:00")
-                ).astimezone(UTC)
-            )
-
             if existing_events:
                 logger.info(
                     "Found existing events, checking for updates",
@@ -172,50 +170,23 @@ class FlightEmailProcessor(BaseEmailProcessor):
                     new_count=len(new_calendar_events),
                 )
 
-                # Update existing events if needed
+                matched = self._match_existing_flights(
+                    new_calendar_events, existing_events
+                )
                 updated_count = 0
-                for i, new_event in enumerate(new_calendar_events):
-                    if i < len(existing_events):
-                        existing_event = existing_events[i]
+                for new_event, existing_event in zip(
+                    new_calendar_events, matched, strict=True
+                ):
+                    if existing_event is not None:
                         if self.calendar_client.needs_update(existing_event, new_event):
-                            event_id = existing_event["id"]
-                            success = self.calendar_client.update_event(
-                                event_id, new_event
-                            )
-                            if success:
-                                updated_count += 1
-                                logger.info(
-                                    "Updated existing calendar event",
-                                    event_id=event_id,
-                                    confirmation_code=confirmation_code,
-                                )
-                            else:
+                            if not self.calendar_client.update_event(
+                                existing_event["id"], new_event
+                            ):
                                 raise CalendarAPIError("Calendar event update failed")
-                        else:
-                            logger.info(
-                                "No update needed for existing event",
-                                event_id=existing_event["id"],
-                                confirmation_code=confirmation_code,
-                            )
-
-                # If there are more new events than existing ones, create the additional ones
-                if len(new_calendar_events) > len(existing_events):
-                    for new_event in new_calendar_events[len(existing_events) :]:
-                        event_id = self.calendar_client.create_event(new_event)
-                        if not event_id:
-                            raise CalendarAPIError("Calendar event creation failed")
-                        if event_id:
-                            logger.info(
-                                "Created additional calendar event",
-                                event_id=event_id,
-                                confirmation_code=confirmation_code,
-                            )
-
-                for old_event in existing_events[len(new_calendar_events) :]:
-                    if not self.calendar_client.delete_event(old_event["id"]):
-                        raise CalendarAPIError(
-                            "Obsolete calendar event deletion failed"
-                        )
+                            updated_count += 1
+                    elif not self.calendar_client.create_event(new_event):
+                        raise CalendarAPIError("Calendar event creation failed")
+                # A partial email is not evidence that unmentioned flights were cancelled.
 
                 logger.info(
                     "Processed existing events",
@@ -249,6 +220,71 @@ class FlightEmailProcessor(BaseEmailProcessor):
             logger.error(
                 "Failed to create/update calendar events",
                 email_id=email.id,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             return []
+
+    @staticmethod
+    def _match_existing_flights(
+        new_events: list[CalendarEvent], existing: list[dict]
+    ) -> list[dict | None]:
+        """Match exact flights first; allow an unambiguous reschedule of one flight."""
+
+        def identity(description: str) -> tuple[str, str]:
+            lines = description.splitlines()
+            flight = next(
+                (
+                    line.removeprefix("Flight: ")
+                    for line in lines
+                    if line.startswith("Flight: ")
+                ),
+                "",
+            )
+            route = next(
+                (
+                    line.removeprefix("Route: ")
+                    for line in lines
+                    if line.startswith("Route: ")
+                ),
+                "",
+            )
+            if not flight or not route:
+                raise CalendarAPIError("Cannot identify an existing flight safely")
+            return flight, route
+
+        new_keys = [identity(event.description or "") for event in new_events]
+        remaining = {event["id"]: event for event in existing}
+        old_keys = {
+            event["id"]: identity(event.get("description", "")) for event in existing
+        }
+        matched: list[dict | None] = [None] * len(new_events)
+        for i, new_event in enumerate(new_events):
+            exact = [
+                event
+                for event_id, event in remaining.items()
+                if old_keys[event_id] == new_keys[i]
+                and datetime.fromisoformat(
+                    event["start"]["dateTime"].replace("Z", "+00:00")
+                ).astimezone(UTC)
+                == new_event.start_time.astimezone(UTC)
+            ]
+            if len(exact) > 1:
+                raise CalendarAPIError("Ambiguous duplicate flight events")
+            if exact:
+                matched[i] = remaining.pop(exact[0]["id"])
+        for i, key in enumerate(new_keys):
+            if matched[i] is not None:
+                continue
+            candidates = [
+                event
+                for event_id, event in remaining.items()
+                if old_keys[event_id] == key
+            ]
+            unmatched = sum(
+                matched[j] is None and other == key for j, other in enumerate(new_keys)
+            )
+            if candidates:
+                if len(candidates) != 1 or unmatched != 1:
+                    raise CalendarAPIError("Ambiguous flight reschedule")
+                matched[i] = remaining.pop(candidates[0]["id"])
+        return matched

@@ -3,6 +3,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from ..models.carshare import get_provider_from_domain
 from ..models.email_types import EmailMessage
 from ..processors.factory import EmailProcessorFactory
 from ..services.gmail_client import GmailClient
@@ -13,11 +14,11 @@ from .exceptions import DataExtractionError
 
 def booking_keys(
     email: EmailMessage, data: dict, domains: list[str]
-) -> set[tuple[str, str]]:
+) -> set[tuple[str, str, str]]:
     """Match reservation identifiers within the original provider's domain."""
     domain = booking_domain(email.original_domain, domains)
     keys = {
-        (domain, str(data[field]).strip().upper())
+        (domain, field, str(data[field]).strip().upper())
         for field in ("confirmation_code", "booking_reference")
         if data.get(field) and str(data[field]).strip()
     }
@@ -55,7 +56,7 @@ def prepare_backfill(
         start_date=oldest.astimezone(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d"),
         processed_only=True,
     )
-    latest: dict[tuple[str, str], datetime] = {}
+    latest: dict[tuple[str, str, str], datetime] = {}
     for email in processed:
         if email.received_at < oldest:
             continue
@@ -77,4 +78,13 @@ def prepare_backfill(
             for key in pending_keys[email.id]
         )
     }
+    # shortcut: booking-level history cannot prove flight coverage; add leg-level reconciliation before automating conflicts.
+    if any(
+        email.id in superseded
+        and get_provider_from_domain(email.original_domain) is None
+        for email in emails
+    ):
+        raise DataExtractionError(
+            "A later processed flight booking requires manual reconciliation"
+        )
     return prepared, superseded

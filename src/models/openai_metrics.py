@@ -72,14 +72,14 @@ class OpenAIMetrics(BaseModel):
         error_message: str | None = None,
     ) -> "OpenAIMetrics":
         """Create OpenAIMetrics from OpenAI API response."""
-        if success and response and hasattr(response, "usage"):
+        if response is not None and getattr(response, "usage", None) is not None:
             usage = OpenAIUsage(
                 prompt_tokens=response.usage.prompt_tokens,
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens,
             )
         else:
-            # Default values for failed calls
+            # No usage is available for attempts without an API response
             usage = OpenAIUsage(
                 prompt_tokens=0,
                 completion_tokens=0,

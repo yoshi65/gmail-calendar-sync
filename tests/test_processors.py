@@ -168,7 +168,13 @@ class TestFlightEmailProcessor:
     ):
         processor.openai_client.extract_flight_info.return_value = sample_flight_booking
         processor.calendar_client.find_events_by_confirmation_code.return_value = (
-            [{"id": "old", "start": {"dateTime": "2030-01-01T00:00:00Z"}}]
+            [
+                {
+                    "id": "old",
+                    "start": {"dateTime": "2030-01-01T00:00:00Z"},
+                    "description": "Flight: ANA NH006\nRoute: NRT → LAX",
+                }
+            ]
             if existing
             else []
         )
@@ -196,7 +202,7 @@ class TestFlightEmailProcessor:
             event_id = str(len(stored))
             stored[event_id] = {
                 "id": event_id,
-                "start": {"dateTime": event.start_time.isoformat()},
+                **event.to_google_calendar_format(),
             }
             return event_id
 
@@ -215,6 +221,47 @@ class TestFlightEmailProcessor:
         assert len(stored) == 2
         assert processor.process(sample_email).success
         assert len(stored) == 2
+
+    @pytest.mark.parametrize("return_only", [False, True])
+    def test_partial_itinerary_preserves_unmentioned_leg(
+        self, processor, sample_email, sample_flight_booking, return_only
+    ):
+        from datetime import timedelta
+
+        from src.models.calendar import create_flight_events
+
+        full = sample_flight_booking.model_copy(deep=True)
+        returning = full.outbound_segments[0].model_copy(deep=True)
+        returning.flight_number = "NH007"
+        returning.departure_airport, returning.arrival_airport = (
+            returning.arrival_airport,
+            returning.departure_airport,
+        )
+        returning.departure_time += timedelta(days=7)
+        returning.arrival_time += timedelta(days=7)
+        full.return_segments = [returning]
+        existing = [
+            {"id": str(i), **event.to_google_calendar_format()}
+            for i, event in enumerate(create_flight_events(full, "original"))
+        ]
+        processor.calendar_client.find_events_by_confirmation_code.return_value = (
+            existing
+        )
+        processor.calendar_client.needs_update.return_value = True
+        processor.calendar_client.update_event.return_value = True
+        partial = full.model_copy(deep=True)
+        partial.outbound_segments = (
+            [returning] if return_only else partial.outbound_segments
+        )
+        partial.return_segments = []
+        events = processor.create_calendar_events(partial.model_dump(), sample_email)
+        assert len(events) == 1
+        processor.calendar_client.update_event.assert_called_once()
+        assert processor.calendar_client.update_event.call_args.args[0] == (
+            "1" if return_only else "0"
+        )
+        processor.calendar_client.delete_event.assert_not_called()
+        processor.calendar_client.create_event.assert_not_called()
 
 
 class TestEmailProcessorFactory:

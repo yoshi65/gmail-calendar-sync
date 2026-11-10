@@ -115,7 +115,9 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to process car sharing email", email_id=email.id, error=str(e)
+                "Failed to process car sharing email",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
 
             return ProcessingResult(
@@ -148,7 +150,9 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to extract car sharing data", email_id=email.id, error=str(e)
+                "Failed to extract car sharing data",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
             raise
 
@@ -251,7 +255,7 @@ class CarShareEmailProcessor(BaseEmailProcessor):
             logger.error(
                 "Failed to create/update car sharing calendar events",
                 email_id=email.id,
-                error=str(e),
+                error_type=type(e).__name__,
             )
             raise CalendarAPIError("Calendar operation failed") from e
 

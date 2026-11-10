@@ -31,6 +31,35 @@ class OpenAIClient:
         self.settings = settings
         self.client = OpenAI(api_key=settings.openai_api_key)
 
+    def _record_metrics(
+        self, email_type: str, response: Any, start_time: float, error: Exception | None
+    ) -> None:
+        """Record each attempt once, retaining billed usage if parsing failed."""
+        metrics = OpenAIMetrics.create_from_response(
+            model=self.settings.openai_model,
+            email_type=email_type,
+            processing_time_ms=(time.time() - start_time) * 1000,
+            response=response,
+            success=error is None,
+            error_message=type(error).__name__ if error else None,
+        )
+        get_metrics_collector().add_metrics(metrics)
+        event = "OpenAI API call failed" if error else "OpenAI API call completed"
+        log = logger.error if error else logger.info
+        log(
+            event,
+            message=event,
+            model=metrics.model,
+            email_type=email_type,
+            processing_time_ms=metrics.processing_time_ms,
+            prompt_tokens=metrics.usage.prompt_tokens,
+            completion_tokens=metrics.usage.completion_tokens,
+            total_tokens=metrics.usage.total_tokens,
+            cost_usd=metrics.cost_usd,
+            success=metrics.success,
+            error_type=metrics.error_message,
+        )
+
     def extract_flight_info(
         self, email_content: str, email_subject: str = ""
     ) -> FlightBooking | None:
@@ -98,11 +127,11 @@ Email Content:
 
 Extract the flight booking information from this email and return it as JSON."""
 
+        response = None
+        start_time = time.time()
+        error: Exception | None = None
         try:
             logger.info("Extracting flight info from email")
-
-            # Start timing
-            start_time = time.time()
 
             response = self.client.chat.completions.create(
                 model=self.settings.openai_model,
@@ -112,34 +141,6 @@ Extract the flight booking information from this email and return it as JSON."""
                 ],
                 max_completion_tokens=8192,
                 response_format={"type": "json_object"},
-            )
-
-            # Calculate processing time
-            processing_time_ms = (time.time() - start_time) * 1000
-
-            # Create and collect metrics
-            metrics = OpenAIMetrics.create_from_response(
-                model=self.settings.openai_model,
-                email_type="flight",
-                processing_time_ms=processing_time_ms,
-                response=response,
-                success=True,
-            )
-
-            # Add to metrics collector
-            get_metrics_collector().add_metrics(metrics)
-
-            logger.info(
-                "OpenAI API call completed",
-                message="OpenAI API call completed",
-                model=metrics.model,
-                email_type=metrics.email_type,
-                processing_time_ms=metrics.processing_time_ms,
-                prompt_tokens=metrics.usage.prompt_tokens,
-                completion_tokens=metrics.usage.completion_tokens,
-                total_tokens=metrics.usage.total_tokens,
-                cost_usd=metrics.cost_usd,
-                success=metrics.success,
             )
 
             content = response.choices[0].message.content
@@ -187,37 +188,12 @@ Extract the flight booking information from this email and return it as JSON."""
             return flight_booking
 
         except Exception as e:
-            # Calculate processing time even for failed calls
-            processing_time_ms = (
-                (time.time() - start_time) * 1000 if "start_time" in locals() else 0
-            )
-
-            # Create and collect error metrics
-            error_metrics = OpenAIMetrics.create_from_response(
-                model=self.settings.openai_model,
-                email_type="flight",
-                processing_time_ms=processing_time_ms,
-                response=None,
-                success=False,
-                error_message=type(e).__name__,
-            )
-
-            # Add to metrics collector
-            get_metrics_collector().add_metrics(error_metrics)
-
-            logger.error(
-                "OpenAI API call failed",
-                message="OpenAI API call failed",
-                model=error_metrics.model,
-                email_type=error_metrics.email_type,
-                processing_time_ms=error_metrics.processing_time_ms,
-                cost_usd=error_metrics.cost_usd,
-                success=error_metrics.success,
-                error_type=type(e).__name__,
-            )
+            error = e
             if isinstance(e, DataExtractionError):
                 raise
             raise OpenAIAPIError("OpenAI request or response processing failed") from e
+        finally:
+            self._record_metrics("flight", response, start_time, error)
 
     def _convert_to_flight_booking(self, data: dict[str, Any]) -> FlightBooking | None:
         """Convert extracted data to FlightBooking model."""
@@ -248,9 +224,7 @@ Extract the flight booking information from this email and return it as JSON."""
                 try:
                     booking_date = datetime.fromisoformat(data["booking_date"])
                 except ValueError:
-                    logger.warning(
-                        "Invalid booking date format", date=data["booking_date"]
-                    )
+                    logger.warning("Invalid booking date format", field="booking_date")
 
             checkin_opens = None
             if data.get("checkin_opens"):
@@ -258,7 +232,7 @@ Extract the flight booking information from this email and return it as JSON."""
                     checkin_opens = datetime.fromisoformat(data["checkin_opens"])
                 except ValueError:
                     logger.warning(
-                        "Invalid checkin opens date format", date=data["checkin_opens"]
+                        "Invalid checkin opens date format", field="checkin_opens"
                     )
 
             flight_booking = FlightBooking(
@@ -276,7 +250,7 @@ Extract the flight booking information from this email and return it as JSON."""
             return flight_booking
 
         except Exception as e:
-            logger.error("Failed to convert flight data", error=str(e))
+            logger.error("Failed to convert flight data", error_type=type(e).__name__)
             return None
 
     def _create_flight_segment(
@@ -380,14 +354,14 @@ Email Content:
 
 Extract the car sharing booking information from this email and return it as JSON."""
 
+        response = None
+        start_time = time.time()
+        error: Exception | None = None
         try:
             logger.info(
                 "Extracting car sharing info from email",
                 provider=provider,
             )
-
-            # Start timing
-            start_time = time.time()
 
             response = self.client.chat.completions.create(
                 model=self.settings.openai_model,
@@ -397,34 +371,6 @@ Extract the car sharing booking information from this email and return it as JSO
                 ],
                 max_completion_tokens=8192,
                 response_format={"type": "json_object"},
-            )
-
-            # Calculate processing time
-            processing_time_ms = (time.time() - start_time) * 1000
-
-            # Create and collect metrics
-            metrics = OpenAIMetrics.create_from_response(
-                model=self.settings.openai_model,
-                email_type="carshare",
-                processing_time_ms=processing_time_ms,
-                response=response,
-                success=True,
-            )
-
-            # Add to metrics collector
-            get_metrics_collector().add_metrics(metrics)
-
-            logger.info(
-                "OpenAI API call completed",
-                message="OpenAI API call completed",
-                model=metrics.model,
-                email_type=metrics.email_type,
-                processing_time_ms=metrics.processing_time_ms,
-                prompt_tokens=metrics.usage.prompt_tokens,
-                completion_tokens=metrics.usage.completion_tokens,
-                total_tokens=metrics.usage.total_tokens,
-                cost_usd=metrics.cost_usd,
-                success=metrics.success,
             )
 
             content = response.choices[0].message.content
@@ -475,37 +421,12 @@ Extract the car sharing booking information from this email and return it as JSO
             return carshare_booking
 
         except Exception as e:
-            # Calculate processing time even for failed calls
-            processing_time_ms = (
-                (time.time() - start_time) * 1000 if "start_time" in locals() else 0
-            )
-
-            # Create and collect error metrics
-            error_metrics = OpenAIMetrics.create_from_response(
-                model=self.settings.openai_model,
-                email_type="carshare",
-                processing_time_ms=processing_time_ms,
-                response=None,
-                success=False,
-                error_message=type(e).__name__,
-            )
-
-            # Add to metrics collector
-            get_metrics_collector().add_metrics(error_metrics)
-
-            logger.error(
-                "OpenAI API call failed",
-                message="OpenAI API call failed",
-                model=error_metrics.model,
-                email_type=error_metrics.email_type,
-                processing_time_ms=error_metrics.processing_time_ms,
-                cost_usd=error_metrics.cost_usd,
-                success=error_metrics.success,
-                error_type=type(e).__name__,
-            )
+            error = e
             if isinstance(e, DataExtractionError):
                 raise
             raise OpenAIAPIError("OpenAI request or response processing failed") from e
+        finally:
+            self._record_metrics("carshare", response, start_time, error)
 
     def _convert_to_carshare_booking(
         self, data: dict[str, Any], provider: str
@@ -563,16 +484,16 @@ Extract the car sharing booking information from this email and return it as JSO
                 try:
                     booking_date = datetime.fromisoformat(data["booking_date"])
                 except ValueError:
-                    logger.warning(
-                        "Invalid booking date format", date=data["booking_date"]
-                    )
+                    logger.warning("Invalid booking date format", field="booking_date")
 
             # Parse required times
             try:
                 start_time = datetime.fromisoformat(data["start_time"])
                 end_time = datetime.fromisoformat(data["end_time"])
             except (KeyError, ValueError) as e:
-                logger.error("Invalid or missing start/end time", error=str(e))
+                logger.error(
+                    "Invalid or missing start/end time", error_type=type(e).__name__
+                )
                 return None
 
             carshare_booking = CarShareBooking(
@@ -593,5 +514,7 @@ Extract the car sharing booking information from this email and return it as JSO
             return carshare_booking
 
         except Exception as e:
-            logger.error("Failed to convert car sharing data", error=str(e))
+            logger.error(
+                "Failed to convert car sharing data", error_type=type(e).__name__
+            )
             return None

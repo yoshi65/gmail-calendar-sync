@@ -283,8 +283,8 @@ def test_sender_aliases_share_reservation_history():
     processor.extract_data.return_value = {"confirmation_code": "TEST123"}
     factory = Mock()
     factory.get_processor.return_value = processor
-    _, superseded = prepare_backfill([older], gmail, factory)
-    assert superseded == {"older"}
+    with pytest.raises(DataExtractionError, match="manual reconciliation"):
+        prepare_backfill([older], gmail, factory)
 
 
 def test_missing_identifier_stops_backfill_before_writes():
@@ -368,3 +368,52 @@ def test_lookup_scopes_each_identifier_before_trying_next(fallback):
         assert calendar.find_events_by_reservation_id(
             "TEST-BOOKING", "TEST-CONFIRM", email("pending")
         ) == [correct]
+
+
+def test_equal_values_in_different_identifier_fields_are_not_superseded():
+    gmail = Mock(settings=Settings(_env_file=None))
+    gmail.get_all_supported_emails.return_value = [
+        email("processed", datetime(2030, 1, 2, tzinfo=UTC))
+    ]
+    processor = Mock()
+    processor.extract_data.side_effect = [
+        {"confirmation_code": "123456", "booking_reference": "BOOK-A"},
+        {"confirmation_code": "987654", "booking_reference": "123456"},
+    ]
+    factory = Mock()
+    factory.get_processor.return_value = processor
+    _, superseded = prepare_backfill([email("pending")], gmail, factory)
+    assert not superseded
+
+
+def test_later_processed_partial_flight_does_not_discard_unregistered_leg():
+    settings = Settings(
+        _env_file=None, sync_start_date="2030-01-01", sync_end_date="2030-01-01"
+    )
+    older = email("pending").model_copy(update={"sender": "notice@ana.co.jp"})
+    newer = email("processed", datetime(2030, 1, 3, tzinfo=UTC)).model_copy(
+        update={"sender": "notice@ana.co.jp"}
+    )
+    outbound = {"flight_number": "NH101"}
+    returning = {"flight_number": "NH102"}
+    processor = Mock()
+    processor.extract_data.side_effect = [
+        {
+            "confirmation_code": "TEST123",
+            "outbound_segments": [outbound],
+            "return_segments": [returning],
+        },
+        {
+            "confirmation_code": "TEST123",
+            "outbound_segments": [returning],
+            "return_segments": [],
+        },
+    ]
+    factory = Mock()
+    factory.get_processor.return_value = processor
+    gmail = Mock(settings=settings)
+    gmail.get_all_supported_emails.side_effect = [[older], [newer]]
+    with pytest.raises(DataExtractionError, match="manual reconciliation"):
+        process_emails(gmail, Mock(), factory, settings)
+    processor.process.assert_not_called()
+    gmail.add_label.assert_not_called()
