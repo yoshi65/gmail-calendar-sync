@@ -46,7 +46,8 @@ class TestProcessEmails:
         self.settings.sync_period_hours = None
         self.settings.sync_period_days = 7
 
-    def test_process_emails_with_date_range(self):
+    @patch("src.main.prepare_backfill", return_value=({}, set()))
+    def test_process_emails_with_date_range(self, _prepare):
         """Test processing emails with absolute date range."""
         # Setup
         start_date = datetime.now() - timedelta(days=7)

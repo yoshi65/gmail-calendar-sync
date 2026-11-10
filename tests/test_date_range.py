@@ -1,7 +1,7 @@
 """Tests for date range and time period functionality."""
 
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 
 import pytest
@@ -86,8 +86,8 @@ class TestDateRangeAndTimeFeature:
         # Verify the query includes date filters
         call_args = gmail_client._service.users().messages().list.call_args
         query_param = call_args[1]["q"]
-        assert "after:2024/01/01" in query_param
-        assert "before:2024/01/31" in query_param
+        assert "after:1704034799" in query_param
+        assert "before:1706713200" in query_param
 
     def test_search_emails_with_start_date_only(self, gmail_client):
         """Test email search with start date only."""
@@ -103,7 +103,7 @@ class TestDateRangeAndTimeFeature:
 
         call_args = gmail_client._service.users().messages().list.call_args
         query_param = call_args[1]["q"]
-        assert "after:2024/01/01" in query_param
+        assert "after:1704034799" in query_param
         assert "before:" not in query_param
 
     def test_search_emails_with_end_date_only(self, gmail_client):
@@ -120,7 +120,7 @@ class TestDateRangeAndTimeFeature:
 
         call_args = gmail_client._service.users().messages().list.call_args
         query_param = call_args[1]["q"]
-        assert "before:2024/01/31" in query_param
+        assert "before:1706713200" in query_param
         assert "after:" not in query_param
 
     def test_search_emails_date_range_overrides_since_days(self, gmail_client):
@@ -140,8 +140,8 @@ class TestDateRangeAndTimeFeature:
         query_param = call_args[1]["q"]
 
         # Should use date range, not since_days
-        assert "after:2024/01/01" in query_param
-        assert "before:2024/01/31" in query_param
+        assert "after:1704034799" in query_param
+        assert "before:1706713200" in query_param
 
         # Should not contain since_days calculation
         today = datetime.now()
@@ -210,7 +210,7 @@ class TestDateRangeAndTimeFeature:
         """Test get_flight_emails with date range parameters."""
         # Mock email response
         mock_email = Mock()
-        mock_email.received_at = datetime.now()
+        mock_email.received_at = datetime(2024, 1, 15, tzinfo=UTC)
         mock_get_email.return_value = mock_email
 
         gmail_client._service.users().messages().list().execute.return_value = {
@@ -221,22 +221,22 @@ class TestDateRangeAndTimeFeature:
             start_date="2024-01-01", end_date="2024-01-31"
         )
 
-        assert len(result) == len(
-            gmail_client.settings.flight_domains
-        )  # One email per domain
+        assert (
+            len(result) == 1
+        )  # The same message ID across sender queries is deduplicated.
 
         # Verify search was called with correct parameters
         call_args = gmail_client._service.users().messages().list.call_args
         query_param = call_args[1]["q"]
-        assert "after:2024/01/01" in query_param
-        assert "before:2024/01/31" in query_param
+        assert "after:1704034799" in query_param
+        assert "before:1706713200" in query_param
 
     @patch("src.services.gmail_client.GmailClient.get_email")
     def test_get_flight_emails_with_hours(self, mock_get_email, gmail_client):
         """Test get_flight_emails with hours parameter."""
         # Mock email response
         mock_email = Mock()
-        mock_email.received_at = datetime.now()
+        mock_email.received_at = datetime(2024, 1, 15, tzinfo=UTC)
         mock_get_email.return_value = mock_email
 
         gmail_client._service.users().messages().list().execute.return_value = {
@@ -245,9 +245,9 @@ class TestDateRangeAndTimeFeature:
 
         result = gmail_client.get_flight_emails(since_hours=8)
 
-        assert len(result) == len(
-            gmail_client.settings.flight_domains
-        )  # One email per domain
+        assert (
+            len(result) == 1
+        )  # The same message ID across sender queries is deduplicated.
 
         # Verify search was called with correct parameters
         call_args = gmail_client._service.users().messages().list.call_args

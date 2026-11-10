@@ -9,8 +9,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from ..models.calendar import CalendarEvent
-from ..utils.config import Settings
+from ..models.email_types import EmailMessage
+from ..utils.config import Settings, booking_domain
 from ..utils.exceptions import CalendarAPIError
+from .gmail_client import GmailClient
 
 logger = structlog.get_logger()
 
@@ -20,7 +22,7 @@ class CalendarClient:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._service = None
+        self._service: Any = None
         self.calendar_id = "primary"  # Use primary calendar
 
     def _get_service(self) -> Any:
@@ -170,22 +172,55 @@ class CalendarClient:
             )
             return False
 
+    def scope_events(
+        self, events: list[dict[str, Any]], email: EmailMessage
+    ) -> list[dict[str, Any]]:
+        """Never mutate another provider's booking with the same reservation code."""
+        matched = []
+        gmail = GmailClient(self.settings)
+        domains: dict[str, str] = {}
+        expected = booking_domain(
+            email.original_domain, self.settings.all_supported_domains
+        )
+        for event in events:
+            props = event.get("extendedProperties", {}).get("private", {})
+            if props.get("source") != "gmail-calendar-sync":
+                continue
+            domain = props.get("source_domain")
+            if not domain:
+                source_id = props.get("source_email_id")
+                if not source_id:
+                    raise CalendarAPIError("Cannot verify legacy calendar event source")
+                if source_id not in domains:
+                    domains[source_id] = gmail.get_email(source_id).original_domain
+                domain = domains[source_id]
+            if booking_domain(domain, self.settings.all_supported_domains) == expected:
+                matched.append(event)
+        return matched
+
+    def list_events(self, **filters: Any) -> list[dict[str, Any]]:
+        """Read every Calendar page before making a mutation decision."""
+        events = {}
+        page_token = None
+        while True:
+            page = (
+                self._get_service()
+                .events()
+                .list(calendarId=self.calendar_id, pageToken=page_token, **filters)
+                .execute()
+            )
+            for event in page.get("items", []):
+                events[event["id"]] = event
+            page_token = page.get("nextPageToken")
+            if not page_token:
+                return list(events.values())
+
     def find_events_by_source_email(self, source_email_id: str) -> list[dict[str, Any]]:
         """Find calendar events created from a specific email."""
         try:
-            service = self._get_service()
-
-            # Search for events with matching source email ID in extended properties
-            events_result = (
-                service.events()
-                .list(
-                    calendarId=self.calendar_id,
-                    privateExtendedProperty=f"source_email_id={source_email_id}",
-                )
-                .execute()
+            events = self.list_events(
+                privateExtendedProperty=f"source_email_id={source_email_id}"
             )
-
-            events = events_result.get("items", [])
             logger.info(
                 "Found events by source email",
                 source_email_id=source_email_id,
@@ -233,19 +268,9 @@ class CalendarClient:
     ) -> list[dict[str, Any]]:
         """Find calendar events by confirmation code."""
         try:
-            service = self._get_service()
-
-            # Search for events with matching confirmation code in extended properties
-            events_result = (
-                service.events()
-                .list(
-                    calendarId=self.calendar_id,
-                    privateExtendedProperty=f"confirmation_code={confirmation_code}",
-                )
-                .execute()
+            events = self.list_events(
+                privateExtendedProperty=f"confirmation_code={confirmation_code}"
             )
-
-            events = events_result.get("items", [])
             logger.info(
                 "Found events by confirmation code",
                 confirmation_code=confirmation_code,
@@ -267,19 +292,9 @@ class CalendarClient:
     ) -> list[dict[str, Any]]:
         """Find calendar events by booking reference."""
         try:
-            service = self._get_service()
-
-            # Search for events with matching booking reference in extended properties
-            events_result = (
-                service.events()
-                .list(
-                    calendarId=self.calendar_id,
-                    privateExtendedProperty=f"booking_reference={booking_reference}",
-                )
-                .execute()
+            events = self.list_events(
+                privateExtendedProperty=f"booking_reference={booking_reference}"
             )
-
-            events = events_result.get("items", [])
             logger.info(
                 "Found events by booking reference",
                 booking_reference=booking_reference,
@@ -311,38 +326,24 @@ class CalendarClient:
         return exists
 
     def find_events_by_reservation_id(
-        self, booking_reference: str | None, confirmation_code: str | None
+        self,
+        booking_reference: str | None,
+        confirmation_code: str | None,
+        email: EmailMessage | None = None,
     ) -> list[dict[str, Any]]:
-        """Find calendar events by booking reference (preferred) or confirmation code (fallback)."""
-        events = []
-
-        # First try to find by booking reference (preferred)
-        if booking_reference:
-            events = self.find_events_by_booking_reference(booking_reference)
-            if events:
-                logger.info(
-                    "Found events by booking reference",
-                    booking_reference=booking_reference,
-                    count=len(events),
-                )
-                return events
-
-        # Fallback to confirmation code
-        if confirmation_code:
-            events = self.find_events_by_confirmation_code(confirmation_code)
-            if events:
-                logger.info(
-                    "Found events by confirmation code (fallback)",
-                    confirmation_code=confirmation_code,
-                    count=len(events),
-                )
-                return events
-
-        logger.info(
-            "No events found",
-            booking_reference=booking_reference,
-            confirmation_code=confirmation_code,
-        )
+        """Try each identifier after scoping, then the source email for retries."""
+        for identifier, lookup in (
+            (booking_reference, self.find_events_by_booking_reference),
+            (confirmation_code, self.find_events_by_confirmation_code),
+        ):
+            if identifier:
+                events = lookup(identifier)
+                if email is not None:
+                    events = self.scope_events(events, email)
+                if events:
+                    return events
+        if email is not None:
+            return self.scope_events(self.find_events_by_source_email(email.id), email)
         return []
 
     def needs_update(

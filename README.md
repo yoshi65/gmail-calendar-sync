@@ -8,6 +8,8 @@
 
 OpenAI APIを使用してメール内容を自動解析し、Cloud Run Jobsで定期実行されます。
 
+過去の未処理メールの回収は[期間指定の再処理手順](docs/BACKFILL.md)を参照してください。
+
 ## 使用モデル
 
 `OPENAI_MODEL` で航空券・カーシェア共通のモデルを指定します。既定値は `gpt-5.6-terra` です。旧モデルからの後継は[公式の廃止案内](https://developers.openai.com/api/docs/deprecations)を参照しています。

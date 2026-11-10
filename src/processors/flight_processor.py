@@ -1,5 +1,7 @@
 """Flight email processor."""
 
+from datetime import UTC, datetime
+
 import structlog
 
 from ..models.calendar import CalendarEvent, create_flight_events
@@ -35,7 +37,9 @@ class FlightEmailProcessor(BaseEmailProcessor):
 
         return False
 
-    def process(self, email: EmailMessage) -> ProcessingResult:
+    def process(
+        self, email: EmailMessage, *, extracted_data: dict | None = None
+    ) -> ProcessingResult:
         """Process flight booking email."""
         logger.info(
             "Processing flight email",
@@ -71,7 +75,8 @@ class FlightEmailProcessor(BaseEmailProcessor):
                 )
 
             # Extract flight data using OpenAI
-            extracted_data = self.extract_data(email)
+            if extracted_data is None:
+                extracted_data = self.extract_data(email)
 
             if not extracted_data:
                 return ProcessingResult(
@@ -141,34 +146,21 @@ class FlightEmailProcessor(BaseEmailProcessor):
             confirmation_code = flight_booking.confirmation_code
             booking_reference = flight_booking.booking_reference
 
-            # Check if events already exist for this confirmation code or booking reference
-            if confirmation_code:
-                existing_events = self.calendar_client.find_events_by_confirmation_code(
-                    confirmation_code
-                )
-                logger.info(
-                    "Using confirmation code for duplicate detection",
-                    confirmation_code=confirmation_code,
-                    email_id=email.id,
-                )
-            elif booking_reference:
-                # Fallback to booking reference if no confirmation code
-                existing_events = self.calendar_client.find_events_by_booking_reference(
-                    booking_reference
-                )
-                logger.info(
-                    "Using booking reference as fallback identifier",
-                    booking_reference=booking_reference,
-                    email_id=email.id,
-                )
-            else:
-                existing_events = []
-                logger.warning(
-                    "No confirmation code or booking reference found", email_id=email.id
-                )
+            existing_events = self.calendar_client.find_events_by_reservation_id(
+                booking_reference, confirmation_code, email
+            )
 
             # Create new calendar events from flight data
             new_calendar_events = create_flight_events(flight_booking, email.id)
+
+            for event in new_calendar_events:
+                event.source_domain = email.original_domain
+            new_calendar_events.sort(key=lambda event: event.start_time)
+            existing_events.sort(
+                key=lambda event: datetime.fromisoformat(
+                    event["start"]["dateTime"].replace("Z", "+00:00")
+                ).astimezone(UTC)
+            )
 
             if existing_events:
                 logger.info(
@@ -218,6 +210,12 @@ class FlightEmailProcessor(BaseEmailProcessor):
                                 event_id=event_id,
                                 confirmation_code=confirmation_code,
                             )
+
+                for old_event in existing_events[len(new_calendar_events) :]:
+                    if not self.calendar_client.delete_event(old_event["id"]):
+                        raise CalendarAPIError(
+                            "Obsolete calendar event deletion failed"
+                        )
 
                 logger.info(
                     "Processed existing events",

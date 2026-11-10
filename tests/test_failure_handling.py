@@ -50,6 +50,7 @@ def test_extraction_failure_reaches_summary(kind, response):
         processor = processor_type(settings)
     processor.openai_client = client
     processor.calendar_client = Mock()
+    processor.calendar_client.scope_events.side_effect = lambda events, _: events
     email = EmailMessage(
         id="test-id",
         thread_id="test-thread",
@@ -105,6 +106,9 @@ def test_carshare_write_failure_is_not_success(cancelled):
         return_value=[{"id": "old"}] if cancelled else []
     )
     processor.calendar_client = Mock()
+    processor.calendar_client.scope_events.side_effect = lambda events, _: events
+    processor.calendar_client.find_events_by_reservation_id.return_value = []
+    processor.calendar_client.find_events_by_source_email.return_value = []
     processor.calendar_client.delete_event.return_value = False
     processor.calendar_client.create_events.return_value = [None]
     email = EmailMessage(

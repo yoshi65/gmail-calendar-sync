@@ -1,6 +1,42 @@
 """Configuration management for Gmail Calendar Sync."""
 
+from datetime import datetime, timedelta
+from typing import Self
+from zoneinfo import ZoneInfo
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def booking_domain(domain: str, supported: list[str]) -> str:
+    """Normalize aliases covered by a supported parent sender domain."""
+    return min(
+        (d for d in supported if domain == d or domain.endswith("." + d)),
+        key=len,
+        default=domain,
+    )
+
+
+def date_range_bounds(
+    start_date: str | None, end_date: str | None
+) -> tuple[datetime | None, datetime | None]:
+    """Inclusive calendar dates in Japan, represented as a half-open interval."""
+    parsed: list[datetime | None] = []
+    for name, value in (("start_date", start_date), ("end_date", end_date)):
+        if value is None:
+            parsed.append(None)
+            continue
+        try:
+            date = datetime.strptime(value, "%Y-%m-%d")
+            if date.strftime("%Y-%m-%d") != value:
+                raise ValueError("Non-canonical date")
+        except ValueError as error:
+            raise ValueError(f"Invalid {name} format. Use YYYY-MM-DD") from error
+        parsed.append(date.replace(tzinfo=ZoneInfo("Asia/Tokyo")))
+    start, end = parsed
+    if start and end and start > end:
+        raise ValueError("sync_start_date must not be after sync_end_date")
+    return start, end + timedelta(days=1) if end else None
 
 
 class Settings(BaseSettings):
@@ -52,6 +88,11 @@ class Settings(BaseSettings):
     # Forwarded emails support
     # Comma-separated list of email addresses that forward booking emails
     forwarded_from_emails: str = ""
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> Self:
+        date_range_bounds(self.sync_start_date, self.sync_end_date)
+        return self
 
     @property
     def all_supported_domains(self) -> list[str]:
