@@ -2,10 +2,23 @@
 
 import logging
 import sys
+from collections.abc import MutableMapping
 from typing import Any
 
 import structlog
 from structlog.types import Processor
+
+
+def add_severity(
+    logger: Any, method_name: str, event: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    """Expose structlog levels as Cloud Logging severity."""
+    event["severity"] = {
+        "warn": "WARNING",
+        "fatal": "CRITICAL",
+        "exception": "ERROR",
+    }.get(method_name, method_name.upper())
+    return event
 
 
 def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None:
@@ -24,6 +37,7 @@ def configure_logging(log_level: str = "INFO", json_format: bool = True) -> None
         structlog.processors.TimeStamper(fmt="ISO"),
         # Add log level
         structlog.stdlib.add_log_level,
+        add_severity,
         # Add logger name
         structlog.stdlib.add_logger_name,
     ]

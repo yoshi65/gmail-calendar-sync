@@ -18,6 +18,7 @@ from ..models.carshare import (
 from ..models.flight import Airport, FlightBooking, FlightSegment
 from ..models.openai_metrics import OpenAIMetrics
 from ..utils.config import Settings
+from ..utils.exceptions import DataExtractionError, OpenAIAPIError
 from ..utils.openai_metrics_collector import get_metrics_collector
 
 logger = structlog.get_logger()
@@ -145,8 +146,7 @@ Extract the flight booking information from this email and return it as JSON."""
             content = response.choices[0].message.content
 
             if not content:
-                logger.info("No flight information found in email")
-                return None
+                raise DataExtractionError("OpenAI returned an empty response")
 
             # Parse JSON response
             try:
@@ -162,13 +162,13 @@ Extract the flight booking information from this email and return it as JSON."""
             except json.JSONDecodeError as e:
                 logger.error(
                     "Failed to parse OpenAI JSON response",
-                    error=str(e),
+                    error_type=type(e).__name__,
                 )
-                return None
+                raise DataExtractionError("OpenAI returned invalid JSON") from e
 
             # In json_object mode the model always returns an object, so a
             # "no booking" result is signalled by an explicit sentinel key.
-            if flight_data.get("no_booking_found"):
+            if flight_data == {"no_booking_found": True}:
                 logger.info("No flight information found in email")
                 return None
 
@@ -183,6 +183,8 @@ Extract the flight booking information from this email and return it as JSON."""
                     return_segments=len(flight_booking.return_segments),
                 )
 
+            if flight_booking is None:
+                raise DataExtractionError("OpenAI returned invalid flight data")
             return flight_booking
 
         except Exception as e:
@@ -198,7 +200,7 @@ Extract the flight booking information from this email and return it as JSON."""
                 processing_time_ms=processing_time_ms,
                 response=None,
                 success=False,
-                error_message=str(e),
+                error_message=type(e).__name__,
             )
 
             # Add to metrics collector
@@ -212,9 +214,11 @@ Extract the flight booking information from this email and return it as JSON."""
                 processing_time_ms=error_metrics.processing_time_ms,
                 cost_usd=error_metrics.cost_usd,
                 success=error_metrics.success,
-                error=str(e),
+                error_type=type(e).__name__,
             )
-            return None
+            if isinstance(e, DataExtractionError):
+                raise
+            raise OpenAIAPIError("OpenAI request or response processing failed") from e
 
     def _convert_to_flight_booking(self, data: dict[str, Any]) -> FlightBooking | None:
         """Convert extracted data to FlightBooking model."""
@@ -223,8 +227,9 @@ Extract the flight booking information from this email and return it as JSON."""
             outbound_segments = []
             for segment_data in data.get("outbound_segments", []):
                 segment = self._create_flight_segment(segment_data)
-                if segment:
-                    outbound_segments.append(segment)
+                if segment is None:
+                    raise DataExtractionError("Invalid outbound flight segment")
+                outbound_segments.append(segment)
 
             if not outbound_segments:
                 logger.warning("No valid outbound segments found")
@@ -234,8 +239,9 @@ Extract the flight booking information from this email and return it as JSON."""
             return_segments = []
             for segment_data in data.get("return_segments", []):
                 segment = self._create_flight_segment(segment_data)
-                if segment:
-                    return_segments.append(segment)
+                if segment is None:
+                    raise DataExtractionError("Invalid return flight segment")
+                return_segments.append(segment)
 
             # Parse optional dates
             booking_date = None
@@ -315,7 +321,7 @@ Extract the flight booking information from this email and return it as JSON."""
         except Exception as e:
             logger.error(
                 "Failed to create flight segment",
-                error=str(e),
+                error_type=type(e).__name__,
             )
             return None
 
@@ -426,8 +432,7 @@ Extract the car sharing booking information from this email and return it as JSO
             content = response.choices[0].message.content
 
             if not content:
-                logger.info("No car sharing information found in email")
-                return None
+                raise DataExtractionError("OpenAI returned an empty response")
 
             # Parse JSON response
             try:
@@ -443,13 +448,13 @@ Extract the car sharing booking information from this email and return it as JSO
             except json.JSONDecodeError as e:
                 logger.error(
                     "Failed to parse OpenAI JSON response",
-                    error=str(e),
+                    error_type=type(e).__name__,
                 )
-                return None
+                raise DataExtractionError("OpenAI returned invalid JSON") from e
 
             # In json_object mode the model always returns an object, so a
             # "no booking" result is signalled by an explicit sentinel key.
-            if carshare_data.get("no_booking_found"):
+            if carshare_data == {"no_booking_found": True}:
                 logger.info("No car sharing information found in email")
                 return None
 
@@ -467,6 +472,8 @@ Extract the car sharing booking information from this email and return it as JSO
                     station=carshare_booking.station.station_name,
                 )
 
+            if carshare_booking is None:
+                raise DataExtractionError("OpenAI returned invalid car sharing data")
             return carshare_booking
 
         except Exception as e:
@@ -482,7 +489,7 @@ Extract the car sharing booking information from this email and return it as JSO
                 processing_time_ms=processing_time_ms,
                 response=None,
                 success=False,
-                error_message=str(e),
+                error_message=type(e).__name__,
             )
 
             # Add to metrics collector
@@ -496,9 +503,11 @@ Extract the car sharing booking information from this email and return it as JSO
                 processing_time_ms=error_metrics.processing_time_ms,
                 cost_usd=error_metrics.cost_usd,
                 success=error_metrics.success,
-                error=str(e),
+                error_type=type(e).__name__,
             )
-            return None
+            if isinstance(e, DataExtractionError):
+                raise
+            raise OpenAIAPIError("OpenAI request or response processing failed") from e
 
     def _convert_to_carshare_booking(
         self, data: dict[str, Any], provider: str

@@ -102,7 +102,10 @@ def process_emails(
             if result.success:
                 # Processor handles calendar event creation/updating
                 # Just mark email as processed
-                gmail_client.add_label(email.id, settings.gmail_label)
+                if not gmail_client.add_label(email.id, settings.gmail_label):
+                    result.success = False
+                    result.error_message = "Failed to label processed email"
+                    continue
 
                 if result.extracted_data:
                     # Count events for flight bookings

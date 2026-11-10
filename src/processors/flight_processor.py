@@ -9,6 +9,7 @@ from ..services.calendar_client import CalendarClient
 from ..services.openai_client import OpenAIClient
 from ..utils.config import Settings
 from ..utils.email_filter import is_likely_booking_email, is_promotional_email
+from ..utils.exceptions import CalendarAPIError
 from .base import BaseEmailProcessor
 
 logger = structlog.get_logger()
@@ -108,7 +109,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
                 email_id=email.id,
                 email_type=EmailType.FLIGHT,
                 success=False,
-                error_message=f"Processing error: {str(e)}",
+                error_message=f"Processing error: {type(e).__name__}",
             )
 
     def extract_data(self, email: EmailMessage) -> dict | None:
@@ -128,7 +129,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
             logger.error(
                 "Failed to extract flight data", email_id=email.id, error=str(e)
             )
-            return None
+            raise
 
     def create_calendar_events(
         self, extracted_data: dict, email: EmailMessage
@@ -197,11 +198,7 @@ class FlightEmailProcessor(BaseEmailProcessor):
                                     confirmation_code=confirmation_code,
                                 )
                             else:
-                                logger.error(
-                                    "Failed to update calendar event",
-                                    event_id=event_id,
-                                    confirmation_code=confirmation_code,
-                                )
+                                raise CalendarAPIError("Calendar event update failed")
                         else:
                             logger.info(
                                 "No update needed for existing event",
@@ -213,6 +210,8 @@ class FlightEmailProcessor(BaseEmailProcessor):
                 if len(new_calendar_events) > len(existing_events):
                     for new_event in new_calendar_events[len(existing_events) :]:
                         event_id = self.calendar_client.create_event(new_event)
+                        if not event_id:
+                            raise CalendarAPIError("Calendar event creation failed")
                         if event_id:
                             logger.info(
                                 "Created additional calendar event",
@@ -244,6 +243,8 @@ class FlightEmailProcessor(BaseEmailProcessor):
                     successful_count=successful_count,
                 )
 
+                if successful_count != len(new_calendar_events):
+                    raise CalendarAPIError("Some calendar events could not be created")
                 return new_calendar_events
 
         except Exception as e:

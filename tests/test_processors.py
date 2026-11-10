@@ -153,6 +153,21 @@ class TestFlightEmailProcessor:
         assert result.success is False
         assert result.error_message == "No flight information found in email"
 
+    @pytest.mark.parametrize("existing", [False, True])
+    def test_failed_calendar_write_is_not_success(
+        self, processor, sample_email, sample_flight_booking, existing
+    ):
+        processor.openai_client.extract_flight_info.return_value = sample_flight_booking
+        processor.calendar_client.find_events_by_confirmation_code.return_value = (
+            [{"id": "old"}] if existing else []
+        )
+        processor.calendar_client.create_events.return_value = [None]
+        processor.calendar_client.needs_update.return_value = True
+        processor.calendar_client.update_event.return_value = False
+        result = processor.process(sample_email)
+        assert not result.success
+        assert result.error_message == "Failed to create calendar events"
+
 
 class TestEmailProcessorFactory:
     """Test EmailProcessorFactory."""

@@ -10,6 +10,7 @@ from googleapiclient.errors import HttpError
 
 from ..models.calendar import CalendarEvent
 from ..utils.config import Settings
+from ..utils.exceptions import CalendarAPIError
 
 logger = structlog.get_logger()
 
@@ -199,7 +200,7 @@ class CalendarClient:
                 source_email_id=source_email_id,
                 error=str(error),
             )
-            return []
+            raise CalendarAPIError("Calendar lookup failed") from error
 
     def check_event_exists(
         self, source_email_id: str, confirmation_code: str | None = None
@@ -259,7 +260,7 @@ class CalendarClient:
                 confirmation_code=confirmation_code,
                 error=str(error),
             )
-            return []
+            raise CalendarAPIError("Calendar lookup failed") from error
 
     def find_events_by_booking_reference(
         self, booking_reference: str
@@ -293,7 +294,7 @@ class CalendarClient:
                 booking_reference=booking_reference,
                 error=str(error),
             )
-            return []
+            raise CalendarAPIError("Calendar lookup failed") from error
 
     def check_event_exists_by_confirmation(self, confirmation_code: str) -> bool:
         """Check if events already exist for the given confirmation code."""
@@ -394,5 +395,7 @@ class CalendarClient:
             return False
 
         except Exception as error:
-            logger.error("Error checking if update needed", error=str(error))
-            return False
+            logger.error(
+                "Error checking if update needed", error_type=type(error).__name__
+            )
+            raise CalendarAPIError("Calendar update comparison failed") from error
