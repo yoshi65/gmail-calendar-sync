@@ -1,5 +1,7 @@
 # Gmail Calendar Sync
 
+> **メンテナンス終了**: このプロジェクトは2026-11-10をもってメンテナンスを終了しました。リポジトリは参考用に保持され、今後の更新やサポートはありません。
+
 ✈️🚗 航空券・カーシェア予約メールを自動的にGoogle Calendarの予定として追加するPythonアプリケーション
 
 ![Python](https://img.shields.io/badge/python-3.13+-blue.svg)
