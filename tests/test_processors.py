@@ -16,6 +16,7 @@ from src.models.flight import Airport, FlightBooking, FlightSegment
 from src.processors.carshare_processor import CarShareEmailProcessor
 from src.processors.factory import EmailProcessorFactory
 from src.processors.flight_processor import FlightEmailProcessor
+from src.services.calendar_client import CalendarClient
 from src.utils.config import Settings
 
 
@@ -38,7 +39,15 @@ class TestFlightEmailProcessor:
         processor.openai_client = Mock()
         # Mock the Calendar client
         processor.calendar_client = Mock()
-        processor.calendar_client.find_events_by_reservation_id.return_value = []
+        processor.calendar_client.scope_events.side_effect = lambda events, _: events
+        processor.calendar_client.find_events_by_booking_reference.return_value = []
+        processor.calendar_client.find_events_by_confirmation_code.return_value = []
+        processor.calendar_client.find_events_by_reservation_id.side_effect = (
+            lambda *args: CalendarClient.find_events_by_reservation_id(
+                processor.calendar_client, *args
+            )
+        )
+        processor.calendar_client.find_events_by_source_email.return_value = []
         processor.calendar_client.create_events.return_value = ["event_id_1"]
         return processor
 
@@ -153,6 +162,107 @@ class TestFlightEmailProcessor:
         assert result.success is False
         assert result.error_message == "No flight information found in email"
 
+    @pytest.mark.parametrize("existing", [False, True])
+    def test_failed_calendar_write_is_not_success(
+        self, processor, sample_email, sample_flight_booking, existing
+    ):
+        processor.openai_client.extract_flight_info.return_value = sample_flight_booking
+        processor.calendar_client.find_events_by_confirmation_code.return_value = (
+            [
+                {
+                    "id": "old",
+                    "start": {"dateTime": "2030-01-01T00:00:00Z"},
+                    "description": "Flight: ANA NH006\nRoute: NRT → LAX",
+                }
+            ]
+            if existing
+            else []
+        )
+        processor.calendar_client.create_events.return_value = [None]
+        processor.calendar_client.needs_update.return_value = True
+        processor.calendar_client.update_event.return_value = False
+        result = processor.process(sample_email)
+        assert not result.success
+        assert result.error_message == "Failed to create calendar events"
+
+    def test_partial_creation_can_be_retried_without_duplicate_segments(
+        self, processor, sample_email, sample_flight_booking
+    ):
+        from datetime import timedelta
+
+        booking = sample_flight_booking.model_copy(deep=True)
+        later = booking.outbound_segments[0].model_copy(deep=True)
+        later.departure_time += timedelta(days=7)
+        later.arrival_time += timedelta(days=7)
+        booking.return_segments = [later]
+        processor.openai_client.extract_flight_info.return_value = booking
+        stored: dict[str, dict] = {}
+
+        def create(event):
+            event_id = str(len(stored))
+            stored[event_id] = {
+                "id": event_id,
+                **event.to_google_calendar_format(),
+            }
+            return event_id
+
+        def partial_create(events):
+            return [create(events[0]), None]
+
+        processor.calendar_client.find_events_by_confirmation_code.side_effect = (
+            lambda _: list(stored.values())
+        )
+        processor.calendar_client.create_events.side_effect = partial_create
+        processor.calendar_client.create_event.side_effect = create
+        processor.calendar_client.needs_update.return_value = False
+        first = processor.process(sample_email)
+        assert not first.success and len(stored) == 1
+        assert processor.process(sample_email).success
+        assert len(stored) == 2
+        assert processor.process(sample_email).success
+        assert len(stored) == 2
+
+    @pytest.mark.parametrize("return_only", [False, True])
+    def test_partial_itinerary_preserves_unmentioned_leg(
+        self, processor, sample_email, sample_flight_booking, return_only
+    ):
+        from datetime import timedelta
+
+        from src.models.calendar import create_flight_events
+
+        full = sample_flight_booking.model_copy(deep=True)
+        returning = full.outbound_segments[0].model_copy(deep=True)
+        returning.flight_number = "NH007"
+        returning.departure_airport, returning.arrival_airport = (
+            returning.arrival_airport,
+            returning.departure_airport,
+        )
+        returning.departure_time += timedelta(days=7)
+        returning.arrival_time += timedelta(days=7)
+        full.return_segments = [returning]
+        existing = [
+            {"id": str(i), **event.to_google_calendar_format()}
+            for i, event in enumerate(create_flight_events(full, "original"))
+        ]
+        processor.calendar_client.find_events_by_confirmation_code.return_value = (
+            existing
+        )
+        processor.calendar_client.needs_update.return_value = True
+        processor.calendar_client.update_event.return_value = True
+        partial = full.model_copy(deep=True)
+        partial.outbound_segments = (
+            [returning] if return_only else partial.outbound_segments
+        )
+        partial.return_segments = []
+        events = processor.create_calendar_events(partial.model_dump(), sample_email)
+        assert len(events) == 1
+        processor.calendar_client.update_event.assert_called_once()
+        assert processor.calendar_client.update_event.call_args.args[0] == (
+            "1" if return_only else "0"
+        )
+        processor.calendar_client.delete_event.assert_not_called()
+        processor.calendar_client.create_event.assert_not_called()
+
 
 class TestEmailProcessorFactory:
     """Test EmailProcessorFactory."""
@@ -245,7 +355,15 @@ class TestCarShareEmailProcessor:
         processor.openai_client = Mock()
         # Mock the Calendar client
         processor.calendar_client = Mock()
-        processor.calendar_client.find_events_by_reservation_id.return_value = []
+        processor.calendar_client.scope_events.side_effect = lambda events, _: events
+        processor.calendar_client.find_events_by_booking_reference.return_value = []
+        processor.calendar_client.find_events_by_confirmation_code.return_value = []
+        processor.calendar_client.find_events_by_reservation_id.side_effect = (
+            lambda *args: CalendarClient.find_events_by_reservation_id(
+                processor.calendar_client, *args
+            )
+        )
+        processor.calendar_client.find_events_by_source_email.return_value = []
         processor.calendar_client.create_events.return_value = ["event_id_1"]
         return processor
 
@@ -468,7 +586,7 @@ class TestCarShareEmailProcessor:
             "extendedProperties": {"private": {"source": "gmail-calendar-sync"}},
         }
 
-        mock_service.events().list().execute.return_value = {"items": [mock_event]}
+        processor.calendar_client.list_events.return_value = [mock_event]
 
         overlapping = processor.find_overlapping_events(sample_carshare_booking)
 
@@ -497,6 +615,7 @@ class TestCarShareEmailProcessor:
         )
 
         # Should delete old events
-        assert processor.calendar_client.delete_event.call_count == 2
+        processor.calendar_client.update_event.assert_called_once()
+        assert processor.calendar_client.delete_event.call_count == 1
         # Should create new events
-        processor.calendar_client.create_events.assert_called_once_with(new_events)
+        processor.calendar_client.create_events.assert_not_called()

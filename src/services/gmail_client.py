@@ -1,7 +1,7 @@
 """Gmail API client."""
 
 import base64
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from ..models.email_types import EmailMessage
-from ..utils.config import Settings
+from ..utils.config import Settings, date_range_bounds
 
 logger = structlog.get_logger()
 
@@ -21,7 +21,7 @@ class GmailClient:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._service = None
+        self._service: Any = None
 
     def _get_service(self) -> Any:
         """Get Gmail API service."""
@@ -60,32 +60,13 @@ class GmailClient:
         try:
             service = self._get_service()
 
-            # Add date filter with priority: absolute dates > hours > days
+            # Epoch seconds avoid Gmail's PST interpretation of calendar dates.
             if start_date or end_date:
-                if start_date:
-                    # Validate and format start date (YYYY-MM-DD -> YYYY/MM/DD)
-                    try:
-                        parsed_start = datetime.strptime(start_date, "%Y-%m-%d")
-                        formatted_start = parsed_start.strftime("%Y/%m/%d")
-                        query = f"{query} after:{formatted_start}"
-                    except ValueError as e:
-                        logger.error("Invalid start_date format", start_date=start_date)
-                        raise ValueError(
-                            f"Invalid start_date format: {start_date}. Use YYYY-MM-DD"
-                        ) from e
-
-                if end_date:
-                    # Validate and format end date (YYYY-MM-DD -> YYYY/MM/DD)
-                    try:
-                        parsed_end = datetime.strptime(end_date, "%Y-%m-%d")
-                        formatted_end = parsed_end.strftime("%Y/%m/%d")
-                        query = f"{query} before:{formatted_end}"
-                    except ValueError as e:
-                        logger.error("Invalid end_date format", end_date=end_date)
-                        raise ValueError(
-                            f"Invalid end_date format: {end_date}. Use YYYY-MM-DD"
-                        ) from e
-
+                start, end = date_range_bounds(start_date, end_date)
+                if start:
+                    query = f"{query} after:{int(start.timestamp()) - 1}"
+                if end:
+                    query = f"{query} before:{int(end.timestamp())}"
             elif since_hours:
                 # Convert hours to datetime and use for filtering
                 since_datetime = datetime.now() - timedelta(hours=since_hours)
@@ -110,18 +91,28 @@ class GmailClient:
 
             logger.info("Searching emails", query=query, max_results=max_results)
 
-            result = (
-                service.users()
-                .messages()
-                .list(userId="me", q=query, maxResults=max_results)
-                .execute()
-            )
-
-            messages = result.get("messages", [])
-            message_ids = [msg["id"] for msg in messages]
+            message_ids: dict[str, None] = {}
+            page_token = None
+            while True:
+                result = (
+                    service.users()
+                    .messages()
+                    .list(
+                        userId="me",
+                        q=query,
+                        maxResults=max_results,
+                        pageToken=page_token,
+                    )
+                    .execute()
+                )
+                for message in result.get("messages", []):
+                    message_ids[message["id"]] = None
+                page_token = result.get("nextPageToken")
+                if not page_token:
+                    break
 
             logger.info("Found emails", count=len(message_ids))
-            return message_ids
+            return list(message_ids)
 
         except HttpError as error:
             logger.error("Failed to search emails", error=str(error))
@@ -146,24 +137,9 @@ class GmailClient:
 
             subject = headers.get("subject", "")
             sender = headers.get("from", "")
-            date_str = headers.get("date", "")
-
-            # Parse date
-            received_at = datetime.now()  # fallback
-            if date_str:
-                try:
-                    # Parse RFC 2822 date format
-                    import email.utils
-
-                    timestamp = email.utils.parsedate_tz(date_str)
-                    if timestamp:
-                        received_at = datetime.fromtimestamp(
-                            email.utils.mktime_tz(timestamp)
-                        )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to parse email date", date_str=date_str, error=str(e)
-                    )
+            received_at = datetime.fromtimestamp(
+                int(message["internalDate"]) / 1000, UTC
+            )
 
             # Extract body
             body = self._extract_body(message["payload"])
@@ -365,6 +341,8 @@ class GmailClient:
     ) -> list[EmailMessage]:
         """Get flight-related emails from supported domains."""
         all_emails = []
+        seen_ids: set[str] = set()
+        start, end = date_range_bounds(start_date, end_date)
 
         for domain in self.settings.flight_domains:
             # Search for emails from this domain, excluding already processed ones
@@ -378,16 +356,25 @@ class GmailClient:
             )
 
             for message_id in message_ids:
+                if message_id in seen_ids:
+                    continue
+                seen_ids.add(message_id)
                 try:
                     email_msg = self.get_email(message_id)
-                    all_emails.append(email_msg)
+                    if (start is None or email_msg.received_at >= start) and (
+                        end is None or email_msg.received_at < end
+                    ):
+                        all_emails.append(email_msg)
                 except Exception as e:
                     logger.error(
-                        "Failed to get email", message_id=message_id, error=str(e)
+                        "Failed to get email",
+                        message_id=message_id,
+                        error_type=type(e).__name__,
                     )
+                    raise
 
         # Sort emails by received date (oldest first) for proper chronological processing
-        all_emails.sort(key=lambda email: email.received_at)
+        all_emails.sort(key=lambda email: (email.received_at, email.id))
 
         logger.info("Retrieved flight emails", count=len(all_emails))
         return all_emails
@@ -398,14 +385,21 @@ class GmailClient:
         since_hours: int | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
+        processed_only: bool = False,
     ) -> list[EmailMessage]:
         """Get all supported emails (flight and car sharing) from supported domains and forwarded emails."""
         all_emails = []
+        seen_ids: set[str] = set()
+        start, end = date_range_bounds(start_date, end_date)
+
+        label_filter = (
+            "label:" if processed_only else "-label:"
+        ) + self.settings.gmail_label
 
         # Get emails from supported domains
         for domain in self.settings.all_supported_domains:
             # Search for emails from this domain, excluding already processed ones
-            query = f"from:{domain} -label:{self.settings.gmail_label}"
+            query = f"from:{domain} {label_filter}"
             message_ids = self.search_emails(
                 query,
                 since_days=since_days,
@@ -415,18 +409,27 @@ class GmailClient:
             )
 
             for message_id in message_ids:
+                if message_id in seen_ids:
+                    continue
+                seen_ids.add(message_id)
                 try:
                     email_msg = self.get_email(message_id)
-                    all_emails.append(email_msg)
+                    if (start is None or email_msg.received_at >= start) and (
+                        end is None or email_msg.received_at < end
+                    ):
+                        all_emails.append(email_msg)
                 except Exception as e:
                     logger.error(
-                        "Failed to get email", message_id=message_id, error=str(e)
+                        "Failed to get email",
+                        message_id=message_id,
+                        error_type=type(e).__name__,
                     )
+                    raise
 
         # Get forwarded emails if configured
         for forwarded_email in self.settings.forwarded_from_email_list:
             # Search for forwarded emails from this address, excluding already processed ones
-            query = f"from:{forwarded_email} (subject:Fwd OR subject:Fw OR subject:転送) -label:{self.settings.gmail_label}"
+            query = f"from:{forwarded_email} (subject:Fwd OR subject:Fw OR subject:転送) {label_filter}"
             message_ids = self.search_emails(
                 query,
                 since_days=since_days,
@@ -436,16 +439,25 @@ class GmailClient:
             )
 
             for message_id in message_ids:
+                if message_id in seen_ids:
+                    continue
+                seen_ids.add(message_id)
                 try:
                     email_msg = self.get_email(message_id)
-                    all_emails.append(email_msg)
+                    if (start is None or email_msg.received_at >= start) and (
+                        end is None or email_msg.received_at < end
+                    ):
+                        all_emails.append(email_msg)
                 except Exception as e:
                     logger.error(
-                        "Failed to get email", message_id=message_id, error=str(e)
+                        "Failed to get email",
+                        message_id=message_id,
+                        error_type=type(e).__name__,
                     )
+                    raise
 
         # Sort emails by received date (oldest first) for proper chronological processing
-        all_emails.sort(key=lambda email: email.received_at)
+        all_emails.sort(key=lambda email: (email.received_at, email.id))
 
         logger.info("Retrieved all supported emails", count=len(all_emails))
         return all_emails

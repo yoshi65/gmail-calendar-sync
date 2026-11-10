@@ -12,6 +12,7 @@ from ..services.calendar_client import CalendarClient
 from ..services.openai_client import OpenAIClient
 from ..utils.config import Settings
 from ..utils.email_filter import is_likely_booking_email, is_promotional_email
+from ..utils.exceptions import CalendarAPIError
 from .base import BaseEmailProcessor
 
 logger = structlog.get_logger()
@@ -34,7 +35,9 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
         return False
 
-    def process(self, email: EmailMessage) -> ProcessingResult:
+    def process(
+        self, email: EmailMessage, *, extracted_data: dict | None = None
+    ) -> ProcessingResult:
         """Process car sharing booking email."""
         logger.info(
             "Processing car sharing email",
@@ -70,7 +73,8 @@ class CarShareEmailProcessor(BaseEmailProcessor):
                 )
 
             # Extract car sharing data using OpenAI
-            extracted_data = self.extract_data(email)
+            if extracted_data is None:
+                extracted_data = self.extract_data(email)
 
             if not extracted_data:
                 return ProcessingResult(
@@ -111,21 +115,23 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to process car sharing email", email_id=email.id, error=str(e)
+                "Failed to process car sharing email",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
 
             return ProcessingResult(
                 email_id=email.id,
                 email_type=EmailType.CAR_SHARE,
                 success=False,
-                error_message=f"Processing error: {str(e)}",
+                error_message=f"Processing error: {type(e).__name__}",
             )
 
     def extract_data(self, email: EmailMessage) -> dict | None:
         """Extract car sharing booking data from email."""
         try:
             # Get provider from domain
-            provider = get_provider_from_domain(email.domain)
+            provider = get_provider_from_domain(email.original_domain)
             if not provider:
                 logger.warning("Unknown car sharing provider", domain=email.domain)
                 return None
@@ -144,9 +150,11 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
         except Exception as e:
             logger.error(
-                "Failed to extract car sharing data", email_id=email.id, error=str(e)
+                "Failed to extract car sharing data",
+                email_id=email.id,
+                error_type=type(e).__name__,
             )
-            return None
+            raise
 
     def create_calendar_events(
         self, extracted_data: dict, email: EmailMessage
@@ -156,8 +164,15 @@ class CarShareEmailProcessor(BaseEmailProcessor):
             # Convert dict back to CarShareBooking model
             carshare_booking = CarShareBooking(**extracted_data)
 
-            # Check for overlapping bookings (time-based conflict detection)
-            overlapping_events = self.find_overlapping_events(carshare_booking)
+            overlapping_events = self.calendar_client.find_events_by_reservation_id(
+                carshare_booking.booking_reference,
+                carshare_booking.confirmation_code,
+                email,
+            )
+            if not overlapping_events:
+                overlapping_events = self.find_overlapping_events(
+                    carshare_booking, email
+                )
 
             # Special handling for cancelled bookings - just remove existing events
             if carshare_booking.status == BookingStatus.CANCELLED:
@@ -179,6 +194,8 @@ class CarShareEmailProcessor(BaseEmailProcessor):
                                 event_id=old_event["id"],
                                 old_summary=old_event.get("summary", "Unknown"),
                             )
+                        else:
+                            raise CalendarAPIError("Calendar cancellation failed")
 
                     logger.info(
                         "Cancelled car sharing booking processed",
@@ -198,6 +215,9 @@ class CarShareEmailProcessor(BaseEmailProcessor):
 
             # Create new calendar events for non-cancelled bookings
             new_calendar_events = create_carshare_events(carshare_booking, email.id)
+
+            for event in new_calendar_events:
+                event.source_domain = email.original_domain
 
             if overlapping_events:
                 logger.info(
@@ -227,36 +247,35 @@ class CarShareEmailProcessor(BaseEmailProcessor):
                     successful_count=successful_count,
                 )
 
+                if successful_count != len(new_calendar_events):
+                    raise CalendarAPIError("Some calendar events could not be created")
             return new_calendar_events
 
         except Exception as e:
             logger.error(
                 "Failed to create/update car sharing calendar events",
                 email_id=email.id,
-                error=str(e),
+                error_type=type(e).__name__,
             )
-            return []
+            raise CalendarAPIError("Calendar operation failed") from e
 
-    def find_overlapping_events(self, booking: CarShareBooking) -> list[dict[str, Any]]:
+    def find_overlapping_events(
+        self, booking: CarShareBooking, email: EmailMessage | None = None
+    ) -> list[dict[str, Any]]:
         """Find existing events that overlap with the new booking time."""
         try:
             # Search for events around the booking time (±2 hours window)
             start_window = booking.start_time - timedelta(hours=2)
             end_window = booking.end_time + timedelta(hours=2)
 
-            service = self.calendar_client._get_service()
-            events_result = (
-                service.events()
-                .list(
-                    calendarId=self.calendar_client.calendar_id,
-                    timeMin=start_window.isoformat(),
-                    timeMax=end_window.isoformat(),
-                    privateExtendedProperty="source=gmail-calendar-sync",
-                )
-                .execute()
+            all_events = self.calendar_client.list_events(
+                timeMin=start_window.isoformat(),
+                timeMax=end_window.isoformat(),
+                privateExtendedProperty="source=gmail-calendar-sync",
             )
 
-            all_events = events_result.get("items", [])
+            if email is not None:
+                all_events = self.calendar_client.scope_events(all_events, email)
 
             # Filter for car sharing events that truly overlap
             overlapping_events = []
@@ -264,6 +283,22 @@ class CarShareEmailProcessor(BaseEmailProcessor):
                 # Check if it's a car sharing event
                 extended_props = event.get("extendedProperties", {}).get("private", {})
                 if not extended_props.get("source") == "gmail-calendar-sync":
+                    continue
+                current_ids = {
+                    value
+                    for value in (booking.booking_reference, booking.confirmation_code)
+                    if value
+                }
+                existing_ids = {
+                    extended_props[key]
+                    for key in ("booking_reference", "confirmation_code")
+                    if extended_props.get(key)
+                }
+                if (
+                    current_ids
+                    and existing_ids
+                    and current_ids.isdisjoint(existing_ids)
+                ):
                     continue
 
                 # Check for time overlap
@@ -287,8 +322,10 @@ class CarShareEmailProcessor(BaseEmailProcessor):
             return overlapping_events
 
         except Exception as e:
-            logger.error("Failed to find overlapping events", error=str(e))
-            return []
+            logger.error(
+                "Failed to find overlapping events", error_type=type(e).__name__
+            )
+            raise CalendarAPIError("Calendar lookup failed") from e
 
     def handle_overlapping_events(
         self,
@@ -299,26 +336,15 @@ class CarShareEmailProcessor(BaseEmailProcessor):
     ) -> None:
         """Handle overlapping events by updating or replacing them."""
 
-        # For car sharing, newer booking usually replaces older one
-        # Delete old overlapping events
-        deleted_count = 0
-        for old_event in overlapping_events:
-            if self.calendar_client.delete_event(old_event["id"]):
-                deleted_count += 1
-                logger.info(
-                    "Deleted overlapping car sharing event",
-                    event_id=old_event["id"],
-                    old_summary=old_event.get("summary", "Unknown"),
-                )
-
-        # Create new events
-        event_ids = self.calendar_client.create_events(new_events)
-        successful_count = sum(1 for event_id in event_ids if event_id is not None)
-
-        logger.info(
-            "Replaced overlapping car sharing events",
-            email_id=email.id,
-            booking_reference=booking.booking_reference,
-            deleted_count=deleted_count,
-            created_count=successful_count,
-        )
+        # Update before deleting extras so a failed write preserves the old booking.
+        for index, new_event in enumerate(new_events):
+            if index < len(overlapping_events):
+                if not self.calendar_client.update_event(
+                    overlapping_events[index]["id"], new_event
+                ):
+                    raise CalendarAPIError("Calendar event update failed")
+            elif not self.calendar_client.create_event(new_event):
+                raise CalendarAPIError("Calendar event creation failed")
+        for old_event in overlapping_events[len(new_events) :]:
+            if not self.calendar_client.delete_event(old_event["id"]):
+                raise CalendarAPIError("Calendar event deletion failed")

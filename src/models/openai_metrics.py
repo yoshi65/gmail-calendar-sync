@@ -26,7 +26,10 @@ class OpenAIMetrics(BaseModel):
         ..., description="Processing time in milliseconds"
     )
     usage: OpenAIUsage = Field(..., description="Token usage information")
-    cost_usd: float = Field(..., description="Estimated cost in USD")
+    cost_usd: float | None = Field(
+        None,
+        description="Uncached standard-rate estimate in USD; null for unknown pricing",
+    )
     success: bool = Field(..., description="Whether the API call was successful")
     error_message: str | None = Field(None, description="Error message if failed")
     timestamp: datetime = Field(
@@ -34,22 +37,29 @@ class OpenAIMetrics(BaseModel):
     )
 
     @property
-    def cost_per_1k_tokens_prompt(self) -> float:
-        """Cost per 1K prompt tokens for gpt-3.5-turbo."""
-        return 0.0015  # $0.0015 per 1K tokens as of 2024
+    def cost_per_1k_tokens_prompt(self) -> float | None:
+        """Standard uncached rates; unknown models are not estimated."""
+        if self.model != "gpt-5.6-terra":
+            return None
+        return 0.004 if self.usage.prompt_tokens > 272_000 else 0.002
 
     @property
-    def cost_per_1k_tokens_completion(self) -> float:
-        """Cost per 1K completion tokens for gpt-3.5-turbo."""
-        return 0.002  # $0.002 per 1K tokens as of 2024
+    def cost_per_1k_tokens_completion(self) -> float | None:
+        """Standard output rate matching the request context tier."""
+        if self.model != "gpt-5.6-terra":
+            return None
+        return 0.018 if self.usage.prompt_tokens > 272_000 else 0.012
 
-    def calculate_cost(self) -> float:
-        """Calculate the estimated cost in USD."""
-        prompt_cost = (self.usage.prompt_tokens / 1000) * self.cost_per_1k_tokens_prompt
-        completion_cost = (
-            self.usage.completion_tokens / 1000
-        ) * self.cost_per_1k_tokens_completion
-        return prompt_cost + completion_cost
+    def calculate_cost(self) -> float | None:
+        """Estimate uncached cost, not the billed amount (pricing: 2026-11-10)."""
+        input_rate = self.cost_per_1k_tokens_prompt
+        output_rate = self.cost_per_1k_tokens_completion
+        if input_rate is None or output_rate is None:
+            return None
+        return (
+            self.usage.prompt_tokens * input_rate
+            + self.usage.completion_tokens * output_rate
+        ) / 1000
 
     @classmethod
     def create_from_response(
@@ -62,14 +72,14 @@ class OpenAIMetrics(BaseModel):
         error_message: str | None = None,
     ) -> "OpenAIMetrics":
         """Create OpenAIMetrics from OpenAI API response."""
-        if success and response and hasattr(response, "usage"):
+        if response is not None and getattr(response, "usage", None) is not None:
             usage = OpenAIUsage(
                 prompt_tokens=response.usage.prompt_tokens,
                 completion_tokens=response.usage.completion_tokens,
                 total_tokens=response.usage.total_tokens,
             )
         else:
-            # Default values for failed calls
+            # No usage is available for attempts without an API response
             usage = OpenAIUsage(
                 prompt_tokens=0,
                 completion_tokens=0,

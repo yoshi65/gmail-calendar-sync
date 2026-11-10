@@ -1,6 +1,7 @@
 """OpenAI API metrics collector for usage analysis."""
 
 from collections import defaultdict
+from typing import Any
 
 import structlog
 
@@ -48,12 +49,16 @@ class OpenAIMetricsCollector:
         total_calls = len(self._metrics)
         successful_calls = sum(1 for m in self._metrics if m.success)
         failed_calls = total_calls - successful_calls
-        total_cost = sum(m.cost_usd for m in self._metrics)
+        total_cost = (
+            sum(m.cost_usd for m in self._metrics if m.cost_usd is not None)
+            if all(m.cost_usd is not None for m in self._metrics)
+            else None
+        )
         total_tokens = sum(m.usage.total_tokens for m in self._metrics)
         total_processing_time = sum(m.processing_time_ms for m in self._metrics)
 
         # Statistics by email type
-        by_email_type: dict[str, dict[str, float]] = defaultdict(
+        by_email_type: dict[str, dict[str, Any]] = defaultdict(
             lambda: {
                 "calls": 0,
                 "successful": 0,
@@ -67,7 +72,10 @@ class OpenAIMetricsCollector:
         for metrics in self._metrics:
             email_type = metrics.email_type
             by_email_type[email_type]["calls"] += 1
-            by_email_type[email_type]["cost_usd"] += metrics.cost_usd
+            if metrics.cost_usd is None:
+                by_email_type[email_type]["cost_usd"] = None
+            elif by_email_type[email_type]["cost_usd"] is not None:
+                by_email_type[email_type]["cost_usd"] += metrics.cost_usd
             by_email_type[email_type]["tokens"] += metrics.usage.total_tokens
             by_email_type[email_type]["processing_time_ms"] += (
                 metrics.processing_time_ms
@@ -85,7 +93,7 @@ class OpenAIMetricsCollector:
             "total_calls": total_calls,
             "successful_calls": successful_calls,
             "failed_calls": failed_calls,
-            "total_cost_usd": round(total_cost, 6),
+            "total_cost_usd": round(total_cost, 6) if total_cost is not None else None,
             "total_tokens": total_tokens,
             "total_processing_time_ms": round(total_processing_time, 2),
             "by_email_type": by_email_type_dict,
@@ -93,8 +101,8 @@ class OpenAIMetricsCollector:
             if total_calls > 0
             else 0.0,
             "average_cost_per_call_usd": round(total_cost / total_calls, 6)
-            if total_calls > 0
-            else 0.0,
+            if total_calls > 0 and total_cost is not None
+            else None,
         }
 
     def log_summary(self) -> None:
@@ -132,12 +140,14 @@ class OpenAIMetricsCollector:
                 calls=stats["calls"],
                 successful=stats["successful"],
                 failed=stats["failed"],
-                cost_usd=round(stats["cost_usd"], 6),
+                cost_usd=round(stats["cost_usd"], 6)
+                if stats["cost_usd"] is not None
+                else None,
                 tokens=stats["tokens"],
                 processing_time_ms=round(stats["processing_time_ms"], 2),
                 average_cost_per_call_usd=round(stats["cost_usd"] / stats["calls"], 6)
-                if stats["calls"] > 0
-                else 0.0,
+                if stats["calls"] > 0 and stats["cost_usd"] is not None
+                else None,
                 average_processing_time_ms=round(
                     stats["processing_time_ms"] / stats["calls"], 2
                 )
@@ -154,37 +164,13 @@ class OpenAIMetricsCollector:
         if not self._metrics:
             return {}
 
-        breakdown = {
-            "total_cost_usd": 0.0,
-            "prompt_tokens_cost_usd": 0.0,
-            "completion_tokens_cost_usd": 0.0,
-            "total_prompt_tokens": 0,
-            "total_completion_tokens": 0,
-            "cost_per_1k_prompt_tokens": 0.0015,  # gpt-3.5-turbo pricing
-            "cost_per_1k_completion_tokens": 0.002,
+        return {
+            "total_cost_usd": self.get_summary()["total_cost_usd"],
+            "total_prompt_tokens": sum(m.usage.prompt_tokens for m in self._metrics),
+            "total_completion_tokens": sum(
+                m.usage.completion_tokens for m in self._metrics
+            ),
         }
-
-        total_prompt_tokens = sum(m.usage.prompt_tokens for m in self._metrics)
-        total_completion_tokens = sum(m.usage.completion_tokens for m in self._metrics)
-
-        prompt_cost = (total_prompt_tokens / 1000) * breakdown[
-            "cost_per_1k_prompt_tokens"
-        ]
-        completion_cost = (total_completion_tokens / 1000) * breakdown[
-            "cost_per_1k_completion_tokens"
-        ]
-
-        breakdown.update(
-            {
-                "total_cost_usd": round(prompt_cost + completion_cost, 6),
-                "prompt_tokens_cost_usd": round(prompt_cost, 6),
-                "completion_tokens_cost_usd": round(completion_cost, 6),
-                "total_prompt_tokens": total_prompt_tokens,
-                "total_completion_tokens": total_completion_tokens,
-            }
-        )
-
-        return breakdown
 
 
 def get_metrics_collector() -> OpenAIMetricsCollector:

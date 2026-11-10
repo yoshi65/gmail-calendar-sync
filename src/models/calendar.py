@@ -17,6 +17,7 @@ class CalendarEvent(BaseModel):
 
     # Additional metadata
     source_email_id: str = Field(..., description="Source email ID")
+    source_domain: str | None = None
     confirmation_code: str | None = Field(None, description="Booking confirmation code")
     booking_reference: str | None = Field(None, description="Booking reference number")
     seat_number: str | None = Field(None, description="Seat number")
@@ -50,6 +51,9 @@ class CalendarEvent(BaseModel):
             "source": "gmail-calendar-sync",
             "source_email_id": self.source_email_id,
         }
+
+        if self.source_domain:
+            private_props["source_domain"] = self.source_domain
 
         if self.confirmation_code:
             private_props["confirmation_code"] = self.confirmation_code

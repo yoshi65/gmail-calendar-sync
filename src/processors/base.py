@@ -15,7 +15,9 @@ class BaseEmailProcessor(ABC):
         pass
 
     @abstractmethod
-    def process(self, email: EmailMessage) -> ProcessingResult:
+    def process(
+        self, email: EmailMessage, *, extracted_data: dict | None = None
+    ) -> ProcessingResult:
         """Process the email and return result."""
         pass
 

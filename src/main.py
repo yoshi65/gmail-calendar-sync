@@ -4,10 +4,12 @@ import sys
 
 import structlog
 
+from .models.carshare import get_provider_from_domain
 from .models.email_types import EmailType, ProcessingResult
 from .processors.factory import EmailProcessorFactory
 from .services.calendar_client import CalendarClient
 from .services.gmail_client import GmailClient
+from .utils.backfill import prepare_backfill
 from .utils.config import Settings, get_settings
 from .utils.exceptions import GmailCalendarSyncError
 from .utils.logging import configure_logging
@@ -72,6 +74,11 @@ def process_emails(
         )
         return []
 
+    prepared: dict[str, dict | None] = {}
+    superseded: set[str] = set()
+    if settings.sync_start_date or settings.sync_end_date:
+        prepared, superseded = prepare_backfill(emails, gmail_client, processor_factory)
+
     logger.info("Processing emails", count=len(emails))
 
     results = []
@@ -96,13 +103,38 @@ def process_emails(
                 continue
 
             # Process the email
-            result = processor.process(email)
+            if email.id in superseded:
+                logger.info("Skipped superseded booking", email_id=email.id)
+                result = ProcessingResult(
+                    email_id=email.id,
+                    email_type=EmailType.CAR_SHARE
+                    if get_provider_from_domain(email.original_domain)
+                    else EmailType.FLIGHT,
+                    success=True,
+                )
+            elif email.id in prepared and prepared[email.id] is None:
+                carshare = get_provider_from_domain(email.original_domain) is not None
+                result = ProcessingResult(
+                    email_id=email.id,
+                    email_type=EmailType.CAR_SHARE if carshare else EmailType.FLIGHT,
+                    success=False,
+                    error_message="No car sharing information found in email"
+                    if carshare
+                    else "No flight information found in email",
+                )
+            elif email.id in prepared:
+                result = processor.process(email, extracted_data=prepared[email.id])
+            else:
+                result = processor.process(email)
             results.append(result)
 
             if result.success:
                 # Processor handles calendar event creation/updating
                 # Just mark email as processed
-                gmail_client.add_label(email.id, settings.gmail_label)
+                if not gmail_client.add_label(email.id, settings.gmail_label):
+                    result.success = False
+                    result.error_message = "Failed to label processed email"
+                    continue
 
                 if result.extracted_data:
                     # Count events for flight bookings
