@@ -105,13 +105,12 @@ Extract the flight booking information from this email and return it as JSON."""
             start_time = time.time()
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.1,
-                max_tokens=2000,
+                max_completion_tokens=8192,
                 response_format={"type": "json_object"},
             )
 
@@ -120,7 +119,7 @@ Extract the flight booking information from this email and return it as JSON."""
 
             # Create and collect metrics
             metrics = OpenAIMetrics.create_from_response(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 email_type="flight",
                 processing_time_ms=processing_time_ms,
                 response=response,
@@ -195,7 +194,7 @@ Extract the flight booking information from this email and return it as JSON."""
 
             # Create and collect error metrics
             error_metrics = OpenAIMetrics.create_from_response(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 email_type="flight",
                 processing_time_ms=processing_time_ms,
                 response=None,
@@ -391,13 +390,12 @@ Extract the car sharing booking information from this email and return it as JSO
             start_time = time.time()
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.1,
-                max_tokens=2000,
+                max_completion_tokens=8192,
                 response_format={"type": "json_object"},
             )
 
@@ -406,7 +404,7 @@ Extract the car sharing booking information from this email and return it as JSO
 
             # Create and collect metrics
             metrics = OpenAIMetrics.create_from_response(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 email_type="carshare",
                 processing_time_ms=processing_time_ms,
                 response=response,
@@ -484,7 +482,7 @@ Extract the car sharing booking information from this email and return it as JSO
 
             # Create and collect error metrics
             error_metrics = OpenAIMetrics.create_from_response(
-                model="gpt-3.5-turbo",
+                model=self.settings.openai_model,
                 email_type="carshare",
                 processing_time_ms=processing_time_ms,
                 response=None,

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     # OpenAI API
     openai_api_key: str = ""
+    openai_model: str = "gpt-5.6-terra"
 
     # Optional settings
     slack_webhook_url: str | None = None

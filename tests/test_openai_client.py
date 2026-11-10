@@ -33,6 +33,7 @@ class TestOpenAIClientExtraction:
     def _client() -> OpenAIClient:
         settings = Mock()
         settings.openai_api_key = "test-key"
+        settings.openai_model = "gpt-5.6-terra"
         return OpenAIClient(settings)
 
     def test_flight_sentinel_returns_none(self, _mock_openai, _mock_collector):
